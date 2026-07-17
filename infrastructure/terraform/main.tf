@@ -1,0 +1,137 @@
+terraform {
+  required_providers {
+    google = {
+      source  = "hashicorp/google"
+      version = "~> 5.0"
+    }
+  }
+}
+
+provider "google" {
+  project = var.project_id
+  region  = var.region
+}
+
+# --- Cloud Storage for Documents ---
+resource "google_storage_bucket" "aura_docs" {
+  name          = "${var.project_id}-aura-documents"
+  location      = var.region
+  force_destroy = true
+  uniform_bucket_level_access = true
+}
+
+# --- Cloud SQL (PostgreSQL) ---
+resource "google_sql_database_instance" "aura_db_instance" {
+  name             = "aura-db-instance"
+  database_version = "POSTGRES_15"
+  region           = var.region
+
+  settings {
+    tier = "db-f1-micro"
+  }
+  deletion_protection = false
+}
+
+resource "google_sql_database" "aura_db" {
+  name     = "auradb"
+  instance = google_sql_database_instance.aura_db_instance.name
+}
+
+resource "google_sql_user" "aura_user" {
+  name     = "aura_user"
+  instance = google_sql_database_instance.aura_db_instance.name
+  password = var.db_password
+}
+
+# --- Artifact Registry ---
+resource "google_artifact_registry_repository" "aura_repo" {
+  location      = var.region
+  repository_id = "aura-repo"
+  description   = "Docker repository for AURA frontend and backend"
+  format        = "DOCKER"
+}
+
+# --- Secret Manager ---
+resource "google_secret_manager_secret" "gemini_api_key" {
+  secret_id = "gemini-api-key"
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "gemini_api_key_version" {
+  secret      = google_secret_manager_secret.gemini_api_key.id
+  secret_data = var.gemini_api_key
+}
+
+# --- Cloud Run: Backend ---
+resource "google_cloud_run_v2_service" "aura_backend" {
+  name     = "aura-backend"
+  location = var.region
+
+  template {
+    containers {
+      # Use a placeholder image initially. You must push your real image and run terraform apply again.
+      image = "us-docker.pkg.dev/cloudrun/container/hello"
+      
+      env {
+        name  = "DATABASE_URL"
+        value = "postgresql://aura_user:${var.db_password}@/auradb?host=/cloudsql/${google_sql_database_instance.aura_db_instance.connection_name}"
+      }
+      
+      env {
+        name  = "GCS_BUCKET_NAME"
+        value = google_storage_bucket.aura_docs.name
+      }
+      
+      env {
+        name = "GEMINI_API_KEY"
+        value_source {
+          secret_key_ref {
+            secret  = google_secret_manager_secret.gemini_api_key.secret_id
+            version = "latest"
+          }
+        }
+      }
+    }
+    
+    volumes {
+      name = "cloudsql"
+      cloud_sql_instance {
+        instances = [google_sql_database_instance.aura_db_instance.connection_name]
+      }
+    }
+  }
+}
+
+# --- Cloud Run: Frontend ---
+resource "google_cloud_run_v2_service" "aura_frontend" {
+  name     = "aura-frontend"
+  location = var.region
+
+  template {
+    containers {
+      image = "us-docker.pkg.dev/cloudrun/container/hello"
+      env {
+        name  = "VITE_API_BASE_URL"
+        value = google_cloud_run_v2_service.aura_backend.uri
+      }
+    }
+  }
+}
+
+# Allow public access to frontend
+resource "google_cloud_run_v2_service_iam_member" "frontend_public_access" {
+  name     = google_cloud_run_v2_service.aura_frontend.name
+  location = google_cloud_run_v2_service.aura_frontend.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+# Allow public access to backend (or restrict it to frontend only using CORS/IAM if preferred)
+resource "google_cloud_run_v2_service_iam_member" "backend_public_access" {
+  name     = google_cloud_run_v2_service.aura_backend.name
+  location = google_cloud_run_v2_service.aura_backend.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
