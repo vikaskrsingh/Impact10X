@@ -1,7 +1,7 @@
 import os
 import shutil
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form, BackgroundTasks
 from ..schemas.document import DocumentCreate, DocumentResponse
 from ..utils.db import fetch_documents, insert_document, update_agent_status
 from ..rag.vector_store import index_document
@@ -27,7 +27,7 @@ def get_documents(agent_id: Optional[str] = None):
         )
 
 @router.post("", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-def upload_document(payload: DocumentCreate):
+def upload_document(payload: DocumentCreate, background_tasks: BackgroundTasks):
     try:
         doc_id = f"{payload.agentId}-{payload.name.lower().replace(' ', '-').replace('_', '-')}"
         # Make ID unique
@@ -44,10 +44,10 @@ def upload_document(payload: DocumentCreate):
         
         if os.path.exists(file_path):
             extracted_content = parse_file(file_path)
-            doc_status = "Approved"
+            doc_status = "Processing"
         else:
             # Fallback mock text generation based on document name and agentId for demo purposes
-            doc_status = payload.status or "Approved"
+            doc_status = payload.status or "Processing"
             extracted_content = (
                 f"This document represents the official guide for {payload.name}. "
                 f"It outlines core regulations, operating policies, and guidelines managed by the {payload.owner} team. "
@@ -66,8 +66,8 @@ def upload_document(payload: DocumentCreate):
             content=extracted_content
         )
         
-        # Parse and index chunks
-        index_document(doc_id, payload.agentId, extracted_content)
+        # Parse and index chunks in background
+        background_tasks.add_task(index_document, doc_id, payload.agentId, extracted_content)
         
         update_agent_status(payload.agentId, "Active")
         
@@ -80,6 +80,7 @@ def upload_document(payload: DocumentCreate):
 
 @router.post("/upload", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
 async def upload_file(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     owner: str = Form(...),
     agentId: str = Form(...)
@@ -116,13 +117,13 @@ async def upload_file(
             doc_id=doc_id,
             name=file.filename,
             owner=owner,
-            status="Approved",
+            status="Processing",
             agent_id=agentId,
             content=extracted_content
         )
         
-        # Index document chunks for RAG search
-        index_document(doc_id, agentId, extracted_content)
+        # Index document chunks for RAG search in background
+        background_tasks.add_task(index_document, doc_id, agentId, extracted_content)
         
         update_agent_status(agentId, "Active")
         
@@ -140,7 +141,7 @@ class UrlUploadRequest(BaseModel):
     agentId: str
 
 @router.post("/url", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
-def upload_url(payload: UrlUploadRequest):
+def upload_url(payload: UrlUploadRequest, background_tasks: BackgroundTasks):
     try:
         import urllib.request
         from html.parser import HTMLParser
@@ -189,13 +190,13 @@ def upload_url(payload: UrlUploadRequest):
             doc_id=doc_id,
             name=payload.url,
             owner=payload.owner,
-            status="Approved",
+            status="Processing",
             agent_id=payload.agentId,
             content=extracted_content
         )
         
-        # Index document chunks for RAG search
-        index_document(doc_id, payload.agentId, extracted_content)
+        # Index document chunks for RAG search in background
+        background_tasks.add_task(index_document, doc_id, payload.agentId, extracted_content)
         
         update_agent_status(payload.agentId, "Active")
         
@@ -205,3 +206,11 @@ def upload_url(payload: UrlUploadRequest):
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"URL parsing failed: {e}"
         )
+
+@router.delete("/{doc_id}")
+def remove_document(doc_id: str):
+    from ..utils.db import delete_document
+    success = delete_document(doc_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {"status": "deleted"}

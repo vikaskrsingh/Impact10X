@@ -4,9 +4,10 @@ import re
 import math
 from collections import Counter
 from typing import List, Dict, Any, Optional
+import concurrent.futures
 from google import genai
 import ollama
-from ..utils.db import insert_document_chunks, fetch_chunks_by_agent
+from ..utils.db import insert_document_chunks, fetch_chunks_by_agent, update_document_status
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
     if not text:
@@ -53,47 +54,71 @@ def get_gemini_client() -> Optional[genai.Client]:
 def is_ollama_enabled() -> bool:
     return os.environ.get("USE_OLLAMA", "false").lower() == "true"
 
+def _embed_chunk(idx: int, chunk: str, use_ollama: bool, client: Optional[genai.Client]) -> Dict[str, Any]:
+    embedding_str = None
+    if use_ollama:
+        try:
+            model_name = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+            response = ollama.embeddings(model=model_name, prompt=chunk)
+            embedding_str = json.dumps(response["embedding"])
+        except Exception as e:
+            print(f"Failed to generate Ollama embedding for chunk {idx}: {e}")
+    elif client:
+        try:
+            response = client.models.embed_content(
+                model='text-embedding-004',
+                contents=chunk
+            )
+            embedding_str = json.dumps(response.embeddings[0].values)
+        except Exception as e:
+            print(f"Failed to generate Gemini embedding for chunk {idx}: {e}")
+            
+    return {
+        "chunk_index": idx,
+        "content": chunk,
+        "embedding": embedding_str
+    }
+
+def process_document_background(document_id: str, agent_id: str, text: str) -> None:
+    try:
+        chunks = chunk_text(text)
+        if not chunks:
+            update_document_status(document_id, "Approved")
+            return
+            
+        use_ollama = is_ollama_enabled()
+        client = get_gemini_client() if not use_ollama else None
+        
+        db_chunks = []
+        max_workers = 5
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = []
+            for idx, chunk in enumerate(chunks):
+                futures.append(executor.submit(_embed_chunk, idx, chunk, use_ollama, client))
+                
+            for future in concurrent.futures.as_completed(futures):
+                res = future.result()
+                db_chunks.append({
+                    "document_id": document_id,
+                    "agent_id": agent_id,
+                    "chunk_index": res["chunk_index"],
+                    "content": res["content"],
+                    "embedding": res["embedding"]
+                })
+                
+        # Sort chunks to maintain order before inserting
+        db_chunks.sort(key=lambda x: x["chunk_index"])
+        insert_document_chunks(db_chunks)
+        update_document_status(document_id, "Approved")
+        
+    except Exception as e:
+        print(f"Background processing failed for document {document_id}: {e}")
+        update_document_status(document_id, "Failed")
+
 def index_document(document_id: str, agent_id: str, text: str) -> None:
-    chunks = chunk_text(text)
-    if not chunks:
-        return
-        
-    use_ollama = is_ollama_enabled()
-    client = get_gemini_client() if not use_ollama else None
-    
-    db_chunks = []
-    
-    for idx, chunk in enumerate(chunks):
-        embedding_str = None
-        
-        if use_ollama:
-            try:
-                model_name = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
-                response = ollama.embeddings(model=model_name, prompt=chunk)
-                embedding_values = response["embedding"]
-                embedding_str = json.dumps(embedding_values)
-            except Exception as e:
-                print(f"Failed to generate Ollama embedding for chunk {idx}: {e}")
-        elif client:
-            try:
-                response = client.models.embed_content(
-                    model='text-embedding-004',
-                    contents=chunk
-                )
-                embedding_values = response.embeddings[0].values
-                embedding_str = json.dumps(embedding_values)
-            except Exception as e:
-                print(f"Failed to generate Gemini embedding for chunk {idx}: {e}")
-        
-        db_chunks.append({
-            "document_id": document_id,
-            "agent_id": agent_id,
-            "chunk_index": idx,
-            "content": chunk,
-            "embedding": embedding_str
-        })
-        
-    insert_document_chunks(db_chunks)
+    # Forward to the new process (used primarily by the original sync logic if called directly)
+    process_document_background(document_id, agent_id, text)
 
 def retrieve_context(agent_id: str, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
     chunks = fetch_chunks_by_agent(agent_id)

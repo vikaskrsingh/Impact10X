@@ -149,6 +149,13 @@ def update_agent_status(agent_id: str, status: str):
     conn.commit()
     conn.close()
 
+def update_document_status(doc_id: str, status: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE documents SET status = ? WHERE id = ?", (status, doc_id))
+    conn.commit()
+    conn.close()
+
 def fetch_documents(agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -159,6 +166,16 @@ def fetch_documents(agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
+
+def delete_document(doc_id: str) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM document_chunks WHERE document_id = ?", (doc_id,))
+    cursor.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+    deleted = cursor.rowcount > 0
+    conn.commit()
+    conn.close()
+    return deleted
 
 def insert_document(doc_id: str, name: str, owner: str, status: str, agent_id: str, content: str = "") -> Dict[str, Any]:
     conn = get_db_connection()

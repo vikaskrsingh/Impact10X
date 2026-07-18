@@ -94,6 +94,12 @@ export async function uploadDocumentUrl(url: string, owner: string, agentId: str
   });
 }
 
+export async function deleteDocument(docId: string): Promise<{ status: string }> {
+  return api<{ status: string }>(`/documents/${docId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function askExpert(expertId: string, question: string): Promise<ChatResponse> {
   return api<ChatResponse>("/chat", {
     method: "POST",

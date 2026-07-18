@@ -1,9 +1,9 @@
-import { FileUp, FileText, ShieldCheck, Tag, Link as LinkIcon } from "lucide-react";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { FileUp, FileText, ShieldCheck, Tag, Link as LinkIcon, Activity, ShieldAlert, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PanelCard } from "../../components/common/PanelCard";
 import { getStoredRole, isAdminRole } from "@/utils/auth";
-import { getDocuments, uploadDocumentFile, uploadDocumentUrl, getAgents } from "../../services/auraApi";
+import { getDocuments, uploadDocumentFile, uploadDocumentUrl, getAgents, deleteDocument } from "../../services/auraApi";
 
 type DocumentItem = {
   id: string;
@@ -49,6 +49,27 @@ export default function KnowledgeCenter() {
     } finally {
       setIsLoadingDocs(false);
     }
+  };
+
+  const handleDeleteDocument = async (docId: string) => {
+    try {
+      await deleteDocument(docId);
+      void loadDocuments();
+    } catch (error) {
+      console.error("Failed to delete document", error);
+    }
+  };
+
+  const getStatusStyles = (status: string) => {
+    if (status === "Failed") return "border-red-500/30 bg-red-500/10 text-red-400";
+    if (status === "Processing") return "border-amber-500/30 bg-amber-500/10 text-amber-400";
+    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-400";
+  };
+
+  const getStatusIcon = (status: string) => {
+    if (status === "Failed") return <ShieldAlert className="mr-1 h-3.5 w-3.5" />;
+    if (status === "Processing") return <Activity className="mr-1 h-3.5 w-3.5 animate-spin" />;
+    return <ShieldCheck className="mr-1 h-3.5 w-3.5" />;
   };
 
   useEffect(() => {
@@ -206,10 +227,15 @@ export default function KnowledgeCenter() {
                   <Tag className="mr-1 h-3.5 w-3.5" />
                   Policy
                 </span>
-                <span className="inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-400">
-                  <ShieldCheck className="mr-1 h-3.5 w-3.5" />
+                <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium ${getStatusStyles(document.status)}`}>
+                  {getStatusIcon(document.status)}
                   {document.status}
                 </span>
+                {isAdmin && (
+                  <button onClick={() => void handleDeleteDocument(document.id)} className="ml-2 rounded p-1.5 text-slate-400 hover:bg-red-500/20 hover:text-red-400 transition">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             </div>
           ))}
