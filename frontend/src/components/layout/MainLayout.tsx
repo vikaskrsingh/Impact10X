@@ -7,35 +7,33 @@ export default function MainLayout() {
   const location = useLocation();
 
   return (
-    <div className="flex min-h-screen text-slate-200 selection:bg-primary/30">
-      <div className="animated-bg" />
-      
+    <div className="flex min-h-screen text-slate-200 bg-slate-950 relative overflow-hidden">
+      {/* Background glow effects (matching Login screen) */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-slate-900 to-slate-950" />
+        <div className="absolute -left-1/4 -bottom-1/4 w-[800px] h-[800px] bg-primary/20 blur-[120px] rounded-full" />
+        <div className="absolute top-1/4 right-1/4 w-[400px] h-[400px] bg-blue-600/10 blur-[100px] rounded-full" />
+      </div>
+
       <Sidebar />
-
-      <div className="flex flex-col flex-1 relative overflow-hidden z-10">
-        
-        {/* Decorative background glow */}
-        <div className="pointer-events-none absolute -top-1/2 left-1/2 h-[800px] w-[800px] -translate-x-1/2 rounded-full bg-primary/5 blur-[120px]" />
-
+      <div className="flex flex-1 flex-col relative z-10">
         <Header />
-
-        <main className="flex-1 p-8 overflow-auto z-10 relative">
+        
+        <main className="flex-1 overflow-x-hidden p-6 lg:p-8 flex flex-col relative">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
-              className="h-full"
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: -10 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="h-full relative z-10 w-full"
             >
               <Outlet />
             </motion.div>
           </AnimatePresence>
         </main>
-
       </div>
-
     </div>
   );
 }

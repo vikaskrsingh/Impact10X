@@ -1,6 +1,7 @@
 export type UserRole = "admin" | "expert";
 
 const ROLE_STORAGE_KEY = "aura-user-role";
+const USERNAME_STORAGE_KEY = "aura-username";
 
 export function getStoredRole(): UserRole | null {
   if (typeof window === "undefined") {
@@ -25,6 +26,21 @@ export function clearStoredRole() {
   }
 
   window.localStorage.removeItem(ROLE_STORAGE_KEY);
+}
+
+export function getStoredUsername(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(USERNAME_STORAGE_KEY);
+}
+
+export function setStoredUsername(username: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(USERNAME_STORAGE_KEY, username);
+}
+
+export function clearStoredUsername() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(USERNAME_STORAGE_KEY);
 }
 
 export function isAdminRole(role?: UserRole | null) {

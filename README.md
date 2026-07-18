@@ -1,10 +1,10 @@
 # AURA
 
-AURA is an enterprise AI knowledge platform designed for European banking workflows. It includes a beautiful React + TypeScript frontend, a FastAPI + SQLite backend, and a role-based experience featuring specialized AI agents for GDPR, AMLD6, MiFID II, and PSD2 compliance.
+AURA is an enterprise AI knowledge platform designed for European banking workflows. It includes a beautiful React + TypeScript frontend, a FastAPI + SQLite backend, and a role-based experience featuring specialized AI agents for KYC, AML, Compliance, and Payments workflows.
 
 ## Features
 
-- **European Regulatory Experts**: Pre-configured specialized AI agents for GDPR, AMLD6, MiFID II, and PSD2 workflows.
+- **Domain Experts**: Pre-configured specialized AI agents for KYC, AML, Compliance, and Payments workflows.
 - **Admin Workspace (Governance)**: Manage expert agents, upload policies, and track knowledge health and usage adoption.
 - **AI Workspace**: A modern, full-height chat interface with real-time streaming, auto-scrolling, and transparent document citations.
 - **Local AI Inference (Ollama)**: Full support for 100% free, private, offline AI inference using local models like `llama3` for chat and `nomic-embed-text` for RAG document embeddings.

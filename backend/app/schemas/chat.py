@@ -6,6 +6,11 @@ class ChatRequest(BaseModel):
     question: str = Field(..., min_length=1)
 
 class ChatResponse(BaseModel):
+    id: int
     answer: str
     sources: List[str]
     expert: str
+    confidenceScore: int
+
+class ChatFeedbackRequest(BaseModel):
+    isHelpful: bool

@@ -1,6 +1,6 @@
-from fastapi import APIRouter, HTTPException, status
-from ..schemas.chat import ChatRequest, ChatResponse
-from ..utils.db import fetch_agents, insert_chat_interaction
+from fastapi import APIRouter, HTTPException, status, Path
+from ..schemas.chat import ChatRequest, ChatResponse, ChatFeedbackRequest
+from ..utils.db import fetch_agents, insert_chat_interaction, update_chat_feedback
 from ..rag.vector_store import retrieve_context
 from ..agents.prompts import get_system_prompt
 from ..services.llm import generate_grounded_answer
@@ -33,7 +33,7 @@ def chat_with_expert(payload: ChatRequest):
         )
         
         # 5. Log chat interaction in database
-        insert_chat_interaction(
+        msg_id = insert_chat_interaction(
             agent_id=payload.expertId,
             user_message=payload.question,
             assistant_message=answer
@@ -63,9 +63,11 @@ def chat_with_expert(payload: ChatRequest):
             resolved_sources.append(name)
             
         return ChatResponse(
+            id=msg_id,
             answer=answer,
             sources=resolved_sources,
-            expert=agent["name"]
+            expert=agent["name"],
+            confidenceScore=agent["health"]
         )
     except HTTPException:
         raise
@@ -73,4 +75,19 @@ def chat_with_expert(payload: ChatRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate answer: {e}"
+        )
+
+@router.post("/{message_id}/feedback", status_code=status.HTTP_200_OK)
+def submit_feedback(payload: ChatFeedbackRequest, message_id: int = Path(...)):
+    try:
+        success = update_chat_feedback(message_id, payload.isHelpful)
+        if not success:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Message not found")
+        return {"status": "success"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to submit feedback: {e}"
         )

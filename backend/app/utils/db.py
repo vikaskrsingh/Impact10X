@@ -70,17 +70,20 @@ def init_db():
         cursor.executemany('''
             INSERT OR IGNORE INTO agents (id, name, owner, health, status) VALUES (?, ?, ?, ?, ?)
         ''', [
-            ("gdpr", "GDPR Expert", "Data Protection", 96, "Active"),
-            ("amld", "AMLD6 Analyst", "Risk", 94, "Active"),
-            ("mifid", "MiFID II Specialist", "Compliance", 92, "Active"),
-            ("psd2", "PSD2 Fraud Expert", "Fraud", 89, "Active")
+            ("kyc", "KYC Expert", "Compliance Team", 98, "Active"),
+            ("aml", "AML Expert", "Risk & Compliance", 97, "Active"),
+            ("compliance", "Compliance Expert", "Regulatory Board", 99, "Active"),
+            ("payments", "Payments Expert", "Payments Processing", 95, "Active"),
+            ("risk", "Risk Expert", "Enterprise Risk", 96, "Active"),
+            ("esg", "ESG Expert", "Sustainability", 94, "Active"),
+            ("wealth", "Wealth Expert", "Wealth Management", 98, "Active")
         ])
 
         default_docs = [
-            ("doc-1", "GDPR Article 30 Records.pdf", "Data Protection", "Approved", "v4", "gdpr", "Standard operating procedures for data protection."),
-            ("doc-2", "Client Consent Policy.pdf", "Data Protection", "Approved", "v2", "gdpr", "Detailed policy on customer consent."),
-            ("doc-3", "AMLD6 High-Risk Screening.pdf", "Risk", "In Review", "v3", "amld", "Transaction monitoring and sanctions."),
-            ("doc-4", "MiFID II Suitability Guidelines.pdf", "Compliance", "Approved", "v1", "mifid", "Credit limits and investment risk policies.")
+            ("doc-1", "KYC_Onboarding_Policy_2026.pdf", "Compliance Team", "Approved", "v4", "kyc", "Standard operating procedures for client onboarding."),
+            ("doc-2", "AML_Sanctions_Policy_2026.pdf", "Risk & Compliance", "Approved", "v2", "aml", "Detailed policy on sanctions screening."),
+            ("doc-3", "ESG Greenwashing Guidelines.pdf", "Sustainability", "In Review", "v1", "esg", "Guidelines on environmental metrics reporting."),
+            ("doc-4", "Wealth Management Client Suitability.pdf", "Wealth Management", "Approved", "v3", "wealth", "Credit limits and investment risk policies.")
         ]
         
         cursor.executemany(
@@ -139,6 +142,13 @@ def delete_agent_by_id(agent_id: str) -> bool:
     conn.close()
     return deleted
 
+def update_agent_status(agent_id: str, status: str):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE agents SET status = ? WHERE id = ?", (status, agent_id))
+    conn.commit()
+    conn.close()
+
 def fetch_documents(agent_id: Optional[str] = None) -> List[Dict[str, Any]]:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -186,15 +196,38 @@ def fetch_chunks_by_agent(agent_id: str) -> List[Dict[str, Any]]:
     conn.close()
     return [dict(row) for row in rows]
 
-def insert_chat_interaction(agent_id: str, user_message: str, assistant_message: str):
+def insert_chat_interaction(agent_id: str, user_message: str, assistant_message: str) -> int:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
         "INSERT INTO chat_history (agent_id, user_message, assistant_message) VALUES (?, ?, ?)",
         (agent_id, user_message, assistant_message)
     )
+    msg_id = cursor.lastrowid
     conn.commit()
     conn.close()
+    return msg_id
+
+def update_chat_feedback(message_id: int, is_helpful: bool) -> bool:
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("SELECT agent_id FROM chat_history WHERE id = ?", (message_id,))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        return False
+        
+    agent_id = row["agent_id"]
+    
+    if is_helpful:
+        cursor.execute("UPDATE agents SET health = MIN(health + 1, 100) WHERE id = ?", (agent_id,))
+    else:
+        cursor.execute("UPDATE agents SET health = MAX(health - 2, 0) WHERE id = ?", (agent_id,))
+        
+    conn.commit()
+    conn.close()
+    return True
 
 def fetch_dashboard_stats() -> Dict[str, Any]:
     conn = get_db_connection()

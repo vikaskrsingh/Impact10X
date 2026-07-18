@@ -3,7 +3,7 @@ import shutil
 from typing import List, Optional
 from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from ..schemas.document import DocumentCreate, DocumentResponse
-from ..utils.db import fetch_documents, insert_document
+from ..utils.db import fetch_documents, insert_document, update_agent_status
 from ..rag.vector_store import index_document
 from ..rag.parser import parse_file
 from google.cloud import storage
@@ -69,6 +69,8 @@ def upload_document(payload: DocumentCreate):
         # Parse and index chunks
         index_document(doc_id, payload.agentId, extracted_content)
         
+        update_agent_status(payload.agentId, "Active")
+        
         return db_doc
     except Exception as e:
         raise HTTPException(
@@ -122,9 +124,84 @@ async def upload_file(
         # Index document chunks for RAG search
         index_document(doc_id, agentId, extracted_content)
         
+        update_agent_status(agentId, "Active")
+        
         return db_doc
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"File upload and parsing failed: {e}"
+        )
+
+from pydantic import BaseModel
+class UrlUploadRequest(BaseModel):
+    url: str
+    owner: str
+    agentId: str
+
+@router.post("/url", response_model=DocumentResponse, status_code=status.HTTP_201_CREATED)
+def upload_url(payload: UrlUploadRequest):
+    try:
+        import urllib.request
+        from html.parser import HTMLParser
+        
+        class TextExtractor(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.text = []
+                self.ignore = False
+            def handle_starttag(self, tag, attrs):
+                if tag in ['script', 'style', 'noscript']:
+                    self.ignore = True
+            def handle_endtag(self, tag):
+                if tag in ['script', 'style', 'noscript']:
+                    self.ignore = False
+            def handle_data(self, data):
+                if not self.ignore and data.strip():
+                    self.text.append(data.strip())
+            def get_text(self):
+                return ' '.join(self.text)
+                
+        # Fetch the URL
+        req = urllib.request.Request(payload.url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            
+        parser = TextExtractor()
+        parser.feed(html)
+        extracted_content = parser.get_text()
+        
+        if not extracted_content:
+            extracted_content = f"Empty content or unparseable format for URL: {payload.url}."
+            
+        # Make ID unique
+        filename = payload.url.split('//')[-1].split('/')[0] + "-webpage"
+        doc_id = f"{payload.agentId}-{filename.lower().replace('.', '-')}"
+        existing_docs = fetch_documents(payload.agentId)
+        suffix = 1
+        original_doc_id = doc_id
+        while any(d["id"] == doc_id for d in existing_docs):
+            doc_id = f"{original_doc_id}-{suffix}"
+            suffix += 1
+            
+        # Write metadata and content to database
+        db_doc = insert_document(
+            doc_id=doc_id,
+            name=payload.url,
+            owner=payload.owner,
+            status="Approved",
+            agent_id=payload.agentId,
+            content=extracted_content
+        )
+        
+        # Index document chunks for RAG search
+        index_document(doc_id, payload.agentId, extracted_content)
+        
+        update_agent_status(payload.agentId, "Active")
+        
+        return db_doc
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"URL parsing failed: {e}"
         )

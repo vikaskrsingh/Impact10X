@@ -18,9 +18,11 @@ export interface DocumentRecord {
 }
 
 export interface ChatResponse {
+  id: number;
   answer: string;
   sources: string[];
   expert: string;
+  confidenceScore: number;
 }
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
@@ -85,10 +87,24 @@ export async function uploadDocumentFile(file: File, owner: string, agentId: str
   return response.json() as Promise<DocumentRecord>;
 }
 
+export async function uploadDocumentUrl(url: string, owner: string, agentId: string): Promise<DocumentRecord> {
+  return api<DocumentRecord>("/documents/url", {
+    method: "POST",
+    body: JSON.stringify({ url, owner, agentId }),
+  });
+}
+
 export async function askExpert(expertId: string, question: string): Promise<ChatResponse> {
   return api<ChatResponse>("/chat", {
     method: "POST",
     body: JSON.stringify({ expertId, question }),
+  });
+}
+
+export async function submitChatFeedback(messageId: number, isHelpful: boolean): Promise<{ status: string }> {
+  return api<{ status: string }>(`/chat/${messageId}/feedback`, {
+    method: "POST",
+    body: JSON.stringify({ isHelpful }),
   });
 }
 

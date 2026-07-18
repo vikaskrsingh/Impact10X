@@ -1,9 +1,9 @@
 export default function RecentActivity() {
 
   const items = [
-    "New GDPR records indexed",
-    "AMLD6 Expert updated",
-    "MiFID II policy approved",
+    "New KYC records indexed",
+    "AML Expert updated",
+    "Compliance policy approved",
     "Payments Expert created"
   ];
 

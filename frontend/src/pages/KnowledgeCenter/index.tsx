@@ -1,8 +1,9 @@
-import { FileUp, FileText, ShieldCheck, Tag } from "lucide-react";
-import { useEffect, useState, useRef } from "react";
+import { FileUp, FileText, ShieldCheck, Tag, Link as LinkIcon } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { PanelCard } from "../../components/common/PanelCard";
 import { getStoredRole, isAdminRole } from "@/utils/auth";
-import { getDocuments, uploadDocumentFile } from "../../services/auraApi";
+import { getDocuments, uploadDocumentFile, uploadDocumentUrl, getAgents } from "../../services/auraApi";
 
 type DocumentItem = {
   id: string;
@@ -13,35 +14,54 @@ type DocumentItem = {
   agentId: string;
 };
 
-const agents = [
-  { id: "all", label: "All Documents" },
-  { id: "gdpr", label: "GDPR & Privacy" },
-  { id: "amld", label: "AMLD6" },
-  { id: "mifid", label: "MiFID II" },
-  { id: "psd2", label: "PSD2 Fraud" },
-];
-
 export default function KnowledgeCenter() {
+  const [searchParams] = useSearchParams();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState("all");
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const role = getStoredRole();
-  const isAdmin = isAdminRole(role);
+  const [agents, setAgents] = useState<{id: string, label: string}[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState(searchParams.get("expert") ?? "");
+  const [isLoadingDocs, setIsLoadingDocs] = useState(false);
+
+  useEffect(() => {
+    void loadAgents();
+  }, []);
+
+  const loadAgents = async () => {
+    try {
+      const fetchedAgents = await getAgents();
+      setAgents(fetchedAgents.map((a) => ({ id: a.id, label: a.name })));
+      
+      const currentSelection = searchParams.get("expert");
+      if (!currentSelection && fetchedAgents.length > 0) {
+        setSelectedAgentId(fetchedAgents[0].id);
+      }
+    } catch (error) {
+      console.error("Unable to load agents", error);
+    }
+  };
+
+  const loadDocuments = async () => {
+    try {
+      setIsLoadingDocs(true);
+      const nextDocuments = await getDocuments(selectedAgentId);
+      setDocuments(nextDocuments.map((document) => ({ ...document, version: document.version || "v1" })));
+    } catch (error) {
+      console.error("Unable to load documents", error);
+    } finally {
+      setIsLoadingDocs(false);
+    }
+  };
 
   useEffect(() => {
     void loadDocuments();
   }, [selectedAgentId]);
 
-  const loadDocuments = async () => {
-    try {
-      const nextDocuments = await getDocuments(selectedAgentId);
-      setDocuments(nextDocuments.map((document) => ({ ...document, version: document.version || "v1" })));
-    } catch (error) {
-      console.error("Unable to load documents", error);
-    }
-  };
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadMode, setUploadMode] = useState<"file" | "url">("file");
+  const [urlInput, setUrlInput] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const role = getStoredRole();
+  const isAdmin = isAdminRole(role);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -51,13 +71,24 @@ export default function KnowledgeCenter() {
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (uploadMode === "file" && !selectedFile) return;
+    if (uploadMode === "url" && !urlInput.trim()) return;
     
     setIsUploading(true);
     try {
-      const uploadedDocument = await uploadDocumentFile(selectedFile, "Admin", selectedAgentId);
-      setDocuments((current) => [{ ...uploadedDocument, version: uploadedDocument.version || "v1" }, ...current]);
+      let uploadedDocument;
+      if (uploadMode === "file" && selectedFile) {
+        uploadedDocument = await uploadDocumentFile(selectedFile, "Admin", selectedAgentId);
+      } else if (uploadMode === "url" && urlInput.trim()) {
+        uploadedDocument = await uploadDocumentUrl(urlInput.trim(), "Admin", selectedAgentId);
+      }
+      
+      if (uploadedDocument) {
+        setDocuments((current) => [{ ...uploadedDocument, version: uploadedDocument.version || "v1" }, ...current]);
+      }
+      
       setSelectedFile(null);
+      setUrlInput("");
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
@@ -78,40 +109,68 @@ export default function KnowledgeCenter() {
       <PanelCard title="Upload documents" subtitle="Only administrators can attach new documents to a specific expert knowledge set">
         {isAdmin ? (
           <div className="rounded-2xl border border-dashed border-primary/40 bg-black/40 p-8 text-center glass-panel">
-            <FileUp className="mx-auto h-10 w-10 text-primary glow-text" />
-            <p className="mt-3 text-sm font-semibold text-slate-100">Upload files for the selected expert knowledge base</p>
+            <div className="flex items-center justify-center gap-4 mb-6">
+              <button 
+                onClick={() => setUploadMode("file")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${uploadMode === 'file' ? 'bg-primary/20 text-primary border border-primary/50' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <FileUp size={16} /> File Upload
+              </button>
+              <button 
+                onClick={() => setUploadMode("url")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${uploadMode === 'url' ? 'bg-primary/20 text-primary border border-primary/50' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                <LinkIcon size={16} /> URL Link
+              </button>
+            </div>
+            
             <p className="mt-2 text-sm text-slate-400">Documents are extracted, embedded, and indexed automatically for the chosen agent.</p>
-            <div className="mt-4 flex flex-col items-center justify-center gap-3 md:flex-row">
-              <select value={selectedAgentId} onChange={(event) => setSelectedAgentId(event.target.value)} className="rounded-md border border-white/10 bg-black/40 px-3 py-2 text-sm text-slate-200 focus:border-primary glow-border">
+            
+            <div className="mt-4 flex flex-col items-center justify-center gap-3 md:flex-row max-w-2xl mx-auto">
+              <select value={selectedAgentId} onChange={(event) => setSelectedAgentId(event.target.value)} className="rounded-md border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-slate-200 focus:border-primary glow-border w-full md:w-auto">
                 {agents.map((agent) => (
                   <option key={agent.id} value={agent.id}>
                     {agent.label}
                   </option>
                 ))}
               </select>
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="rounded-md border border-white/20 glass-panel/5 px-4 py-2 text-sm font-medium text-slate-300 transition hover:glass-panel/10 disabled:opacity-50"
-              >
-                {selectedFile ? "Change file" : "Choose file"}
-              </button>
+              
+              {uploadMode === "file" ? (
+                <>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="rounded-md border border-white/20 glass-panel/5 px-4 py-2.5 text-sm font-medium text-slate-300 transition hover:glass-panel/10 disabled:opacity-50 w-full md:w-auto whitespace-nowrap"
+                  >
+                    {selectedFile ? "Change file" : "Choose file"}
+                  </button>
+                </>
+              ) : (
+                <input
+                  type="url"
+                  placeholder="https://confluence.bank.internal/..."
+                  value={urlInput}
+                  onChange={(e) => setUrlInput(e.target.value)}
+                  className="rounded-md border border-white/10 bg-black/40 px-4 py-2.5 text-sm text-slate-200 focus:border-primary glow-border w-full flex-1"
+                />
+              )}
+              
               <button
                 onClick={() => void handleUpload()}
-                disabled={isUploading || !selectedFile}
-                className="rounded-md bg-primary/80 border border-primary px-4 py-2 text-sm font-medium text-slate-100 transition hover:bg-primary glow-border disabled:opacity-50"
+                disabled={isUploading || (uploadMode === "file" ? !selectedFile : !urlInput.trim())}
+                className="rounded-md bg-primary/80 border border-primary px-6 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-primary glow-border disabled:opacity-50 w-full md:w-auto whitespace-nowrap"
               >
-                {isUploading ? "Uploading..." : "Upload to agent"}
+                {isUploading ? "Processing..." : "Add to agent"}
               </button>
             </div>
-            {selectedFile && (
-              <div className="mt-3 text-sm text-slate-400">
+            {uploadMode === "file" && selectedFile && (
+              <div className="mt-4 text-sm text-slate-400">
                 Selected: <span className="font-medium text-slate-100 glow-text">{selectedFile.name}</span>
               </div>
             )}

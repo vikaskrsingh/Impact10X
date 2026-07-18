@@ -13,19 +13,38 @@ import Analytics from "../pages/Analytics";
 import Settings from "../pages/Settings";
 import { getStoredRole, isAdminRole } from "@/utils/auth";
 
+function ProtectedRoute({ children }: { children: ReactElement }) {
+  const role = getStoredRole();
+  return role !== null ? children : <Navigate to="/login" replace />;
+}
+
 function AdminRoute({ children }: { children: ReactElement }) {
   const role = getStoredRole();
-  return role !== null && isAdminRole(role) ? children : <Navigate to="/login" replace />;
+  return role !== null && isAdminRole(role) ? children : <Navigate to="/workspace" replace />;
+}
+
+function RootRoute() {
+  const role = getStoredRole();
+  if (!role) return <Navigate to="/login" replace />;
+  if (role === "admin") return <Dashboard />;
+  return <Navigate to="/workspace" replace />;
+}
+
+function LoginRoute() {
+  const role = getStoredRole();
+  if (role === "admin") return <Navigate to="/" replace />;
+  if (role === "expert") return <Navigate to="/workspace" replace />;
+  return <Login />;
 }
 
 export default function AppRoutes() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={<LoginRoute />} />
 
-        <Route element={<MainLayout />}>
-          <Route path="/" element={<Dashboard />} />
+        <Route element={<ProtectedRoute><MainLayout /></ProtectedRoute>}>
+          <Route path="/" element={<RootRoute />} />
           <Route path="/experts" element={<AdminRoute><ExpertHub /></AdminRoute>} />
           <Route path="/workspace" element={<Workspace />} />
           <Route path="/knowledge" element={<KnowledgeCenter />} />

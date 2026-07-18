@@ -17,12 +17,11 @@ export function PanelCard({
   className,
 }: PanelCardProps) {
   return (
-    <section className={cn("rounded-2xl glass-panel p-6 relative overflow-hidden group", className)}>
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-      <div className="mb-4 flex items-start justify-between gap-3 relative z-10">
+    <section className={cn("rounded-2xl bg-[#06080d] border border-white/5 p-6 relative overflow-hidden shadow-lg", className)}>
+      <div className="mb-5 flex items-start justify-between gap-3 relative z-10">
         <div>
-          <h3 className="text-lg font-semibold text-slate-100 glow-text">{title}</h3>
-          {subtitle ? <p className="mt-1 text-sm text-slate-400">{subtitle}</p> : null}
+          <h3 className="text-sm font-bold tracking-wide text-white uppercase">{title}</h3>
+          {subtitle ? <p className="mt-1.5 text-[11px] text-slate-500 font-medium">{subtitle}</p> : null}
         </div>
         {actions ? <div className="shrink-0">{actions}</div> : null}
       </div>
@@ -41,23 +40,22 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, note, icon, tone = "blue" }: MetricCardProps) {
   const toneClasses = {
-    blue: "border-primary/30 bg-primary/10 text-primary glow-border shadow-[0_0_15px_-3px_var(--primary)]",
-    green: "border-emerald-500/30 bg-emerald-500/10 text-emerald-400 shadow-[0_0_15px_-3px_#34d399]",
-    amber: "border-amber-500/30 bg-amber-500/10 text-amber-400 shadow-[0_0_15px_-3px_#fbbf24]",
-    slate: "border-white/20 glass-panel/5 text-slate-300",
+    blue: "bg-purple-500/20 text-purple-400",
+    green: "bg-emerald-500/20 text-emerald-400",
+    amber: "bg-amber-500/20 text-amber-400",
+    slate: "bg-slate-500/20 text-slate-400",
   }[tone];
 
   return (
-    <div className="rounded-2xl glass-panel interactive-card p-5 relative overflow-hidden group">
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none" />
-      <div className="flex items-start justify-between gap-3 relative z-10">
+    <div className="rounded-2xl bg-[#06080d] border border-white/5 p-6 shadow-lg transition-transform hover:-translate-y-1 duration-300">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-sm font-medium text-slate-400">{title}</p>
-          <p className="mt-2 text-3xl font-semibold text-slate-100 glow-text">{value}</p>
+          <p className="text-[10px] font-bold tracking-widest text-slate-500 uppercase">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-white">{value}</p>
         </div>
-        <div className={cn("rounded-xl border p-2", toneClasses)}>{icon}</div>
+        <div className={cn("rounded-xl p-3 shrink-0 flex items-center justify-center", toneClasses)}>{icon}</div>
       </div>
-      <p className="mt-4 text-sm text-slate-400 relative z-10">{note}</p>
+      <p className="mt-4 text-xs font-medium text-slate-400">{note}</p>
     </div>
   );
 }

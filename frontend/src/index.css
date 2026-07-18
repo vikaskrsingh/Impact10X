@@ -164,10 +164,7 @@ body {
     height: 100vh;
     z-index: -1;
     overflow: hidden;
-    background: radial-gradient(circle at 15% 50%, oklch(0.2 0.05 260 / 30%), transparent 25%),
-                radial-gradient(circle at 85% 30%, oklch(0.4 0.2 300 / 20%), transparent 25%);
-    background-size: 200% 200%;
-    animation: gradientMove 15s ease infinite alternate;
+    background-color: #0b0f19;
   }
 }
 

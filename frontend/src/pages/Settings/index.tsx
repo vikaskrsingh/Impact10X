@@ -1,5 +1,7 @@
 import { BellRing, KeyRound, RefreshCw, ShieldCheck, UserCircle2 } from "lucide-react";
 import { PanelCard } from "../../components/common/PanelCard";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { getStoredRole, getStoredUsername } from "@/utils/auth";
 
 const preferences = [
   { label: "Expert approval alerts", value: "On" },
@@ -14,6 +16,12 @@ const integrations = [
 ];
 
 export default function Settings() {
+  const role = getStoredRole();
+  const username = getStoredUsername();
+  const isAdmin = role === "admin";
+  const displayName = username || (isAdmin ? "System Administrator" : "Compliance Expert");
+  const displayInitials = displayName.substring(0, 2).toUpperCase();
+
   return (
     <div className="space-y-6">
       <div>
@@ -25,15 +33,21 @@ export default function Settings() {
       <div className="grid gap-6 xl:grid-cols-3">
         <PanelCard title="Profile" subtitle="Regional and user preferences">
           <div className="rounded-xl border border-slate-200 glass-panel/5 border border-white/10 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-full bg-blue-100 p-2 text-primary">
-                <UserCircle2 className="h-5 w-5" />
+              <div className="flex items-center gap-4">
+                <Avatar className="h-16 w-16 border border-primary/50 shadow-[0_0_15px_var(--primary)]">
+                  <AvatarFallback className="text-xl text-primary bg-primary/20">
+                    {displayInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-semibold text-slate-100">
+                    {displayName}
+                  </p>
+                  <p className="text-sm text-slate-400">
+                    {isAdmin ? "Platform Admin" : "Knowledge Expert"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="font-semibold text-slate-100">Vikas Singh</p>
-                <p className="text-sm text-slate-400">Enterprise Admin • London</p>
-              </div>
-            </div>
             <div className="mt-4 rounded-xl border border-slate-200 glass-panel p-3 text-sm text-slate-400">
               Preferred working hours: 08:00–18:00 GMT
             </div>

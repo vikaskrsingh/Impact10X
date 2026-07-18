@@ -2,19 +2,19 @@ import { FileCheck2, ShieldCheck, UserCog, Clock3 } from "lucide-react";
 import { PanelCard } from "../../components/common/PanelCard";
 
 const accessRows = [
-  { name: "Vikas Singh", role: "Data Protection Officer", access: "Full", status: "Active" },
-  { name: "Nehal", role: "Risk Analyst", access: "Restricted", status: "Active" },
+  { name: "System Administrator", role: "Data Protection Officer", access: "Full", status: "Active" },
+  { name: "Compliance Expert", role: "Risk Analyst", access: "Restricted", status: "Active" },
   { name: "Rajdeep", role: "ECB Reporting Lead", access: "Full", status: "Pending review" },
 ];
 
 const approvals = [
-  { title: "PSD2 Fraud policy pack", detail: "Awaiting second approver", state: "Pending" },
-  { title: "GDPR onboarding SOP", detail: "Approved by DPO", state: "Approved" },
-  { title: "AMLD6 Treasury controls", detail: "Pending legal review", state: "In review" },
+  { title: "Payments Fraud policy pack", detail: "Awaiting second approver", state: "Pending" },
+  { title: "KYC onboarding SOP", detail: "Approved by DPO", state: "Approved" },
+  { title: "AML Treasury controls", detail: "Pending legal review", state: "In review" },
 ];
 
 const auditLog = [
-  { action: "EU Policy update approved", actor: "Vikas Singh", time: "12 mins ago" },
+  { action: "EU Policy update approved", actor: "System Administrator", time: "12 mins ago" },
   { action: "New agent workspace created", actor: "Rajdeep", time: "1 hr ago" },
   { action: "Access review requested", actor: "Platform Admin", time: "Yesterday" },
 ];
