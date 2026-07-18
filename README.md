@@ -7,8 +7,10 @@ AURA is an enterprise AI knowledge platform designed for European banking workfl
 - **Domain Experts**: Pre-configured specialized AI agents for KYC, AML, Compliance, and Payments workflows.
 - **Admin Workspace (Governance)**: Manage expert agents, upload policies, and track knowledge health and usage adoption.
 - **AI Workspace**: A modern, full-height chat interface with real-time streaming, auto-scrolling, and transparent document citations.
+- **Dynamic Confidence & Feedback Loop**: Agents display real-time confidence scores based on their health metrics. Users can rate responses (Helpful / Not Helpful) to dynamically adjust an agent's confidence score over time.
+- **Role-Based Access Control & Routing**: Secure protected routes that seamlessly redirect unauthenticated users to the Login screen, and route authenticated users to their appropriate Workspace or Admin Dashboard.
 - **Local AI Inference (Ollama)**: Full support for 100% free, private, offline AI inference using local models like `llama3` for chat and `nomic-embed-text` for RAG document embeddings.
-- **Premium Aesthetics**: Built with Framer Motion and TailwindCSS featuring glassmorphism, dynamic animations, and neon accents.
+- **Premium Aesthetics**: Built with Framer Motion and TailwindCSS featuring glassmorphism, dynamic animations, deep slate backgrounds, and neon accents.
 
 ## Project Structure
 
