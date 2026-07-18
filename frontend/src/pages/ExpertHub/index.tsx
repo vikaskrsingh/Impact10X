@@ -6,7 +6,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { PanelCard } from "../../components/common/PanelCard";
 import { getStoredRole, isAdminRole } from "@/utils/auth";
-import { createAgent, deleteAgent, getAgents } from "../../services/auraApi";
+import { createAgent, deleteAgent, getAgents } from "../../services/omnimindApi";
 
 type Expert = {
   id: string;

@@ -1,6 +1,6 @@
-# AURA
+# OmniMind
 
-AURA is an enterprise AI knowledge platform designed for European banking workflows. It includes a beautiful React + TypeScript frontend, a FastAPI + SQLite backend, and a role-based experience featuring specialized AI agents for KYC, AML, Compliance, and Payments workflows.
+OmniMind is a knowledge AI platform designed for European banking workflows. It includes a beautiful React + TypeScript frontend, a FastAPI + SQLite backend, and a role-based experience featuring specialized AI agents for KYC, AML, Compliance, and Payments workflows.
 
 ## Features
 
@@ -8,7 +8,7 @@ AURA is an enterprise AI knowledge platform designed for European banking workfl
 - **Admin Workspace (Governance)**: Manage expert agents, upload policies, and track knowledge health and usage adoption.
 - **AI Workspace**: A modern, full-height chat interface with real-time streaming, auto-scrolling, and transparent document citations.
 - **Dynamic Confidence & Feedback Loop**: Agents display real-time confidence scores based on their health metrics. Users can rate responses (Helpful / Not Helpful) to dynamically adjust an agent's confidence score over time.
-- **Asynchronous Document Processing**: Built with FastAPI BackgroundTasks and multithreading, AURA seamlessly handles massive document uploads and vector embeddings without blocking or timing out the user interface.
+- **Asynchronous Document Processing**: Built with FastAPI BackgroundTasks and multithreading, OmniMind seamlessly handles massive document uploads and vector embeddings without blocking or timing out the user interface.
 - **Document Management**: Admins have full control over the knowledge base, complete with dynamic visual processing states (Processing, Approved, Failed) and document deletion capabilities.
 - **Role-Based Access Control & Routing**: Secure protected routes that seamlessly redirect unauthenticated users to the Login screen, and route authenticated users to their appropriate Workspace or Admin Dashboard.
 - **Local AI Inference (Ollama)**: Full support for 100% free, private, offline AI inference using local models like `llama3` for chat and `nomic-embed-text` for RAG document embeddings.
@@ -31,11 +31,11 @@ AURA is an enterprise AI knowledge platform designed for European banking workfl
 
 ## Local Development Setup
 
-To run AURA locally, you need to start both the frontend development server and the backend API.
+To run OmniMind locally, you need to start both the frontend development server and the backend API.
 
 ### 1. Start the Backend API
 
-The backend uses FastAPI and stores data locally in a SQLite database (`aura.db`).
+The backend uses FastAPI and stores data locally in a SQLite database (`omnimind.db`).
 
 ```bash
 cd backend
@@ -78,9 +78,9 @@ The frontend will be available at `http://localhost:5173`.
 
 ## Deploying to Google Cloud Platform (GCP)
 
-AURA is designed to be deployed as a decoupled application. The backend will be hosted on **Google Cloud Run** and the frontend on **Firebase Hosting**.
+OmniMind is designed to be deployed as a decoupled application. The backend will be hosted on **Google Cloud Run** and the frontend on **Firebase Hosting**.
 
-*Note: For a production-ready system, you should replace the local SQLite database with Google Cloud SQL (PostgreSQL). The following instructions deploy AURA as a "stateless prototype", meaning the local database will reset whenever the Cloud Run instance sleeps due to inactivity.*
+*Note: For a production-ready system, you should replace the local SQLite database with Google Cloud SQL (PostgreSQL). The following instructions deploy OmniMind as a "stateless prototype", meaning the local database will reset whenever the Cloud Run instance sleeps due to inactivity.*
 
 ### Prerequisites for Deployment
 1. Ensure you have the Google Cloud CLI installed (`gcloud auth login`).
@@ -102,13 +102,13 @@ The backend includes a `Dockerfile` that packages the FastAPI server.
    ```
 3. Deploy the service:
    ```bash
-   gcloud run deploy aura-backend \
+   gcloud run deploy omnimind-backend \
      --source . \
      --region us-central1 \
      --allow-unauthenticated \
      --memory 1024Mi
    ```
-4. **Important**: When the deployment succeeds, the console will output a **Service URL** (e.g., `https://aura-backend-xyz.run.app`). **Copy this URL**.
+4. **Important**: When the deployment succeeds, the console will output a **Service URL** (e.g., `https://omnimind-backend-xyz.run.app`). **Copy this URL**.
 
 ### Step 2: Build the Frontend
 
@@ -147,13 +147,13 @@ This generates a `dist/` folder containing your static production website.
    firebase deploy --only hosting
    ```
 
-When complete, Firebase will provide you with a live Hosting URL (e.g., `https://your-project.web.app`). AURA is now live on the internet!
+When complete, Firebase will provide you with a live Hosting URL (e.g., `https://your-project.web.app`). OmniMind is now live on the internet!
 
 ---
 
 ## Local AI Inference (Ollama Support)
 
-By default, AURA uses a mock simulated response when running locally without API keys. You can configure AURA to use **Google Gemini** for cloud deployments, or **Ollama** for completely free, local, open-source AI inference.
+By default, OmniMind uses a mock simulated response when running locally without API keys. You can configure OmniMind to use **Google Gemini** for cloud deployments, or **Ollama** for completely free, local, open-source AI inference.
 
 ### Setting up Ollama
 1. Download and install [Ollama](https://ollama.com/).
@@ -163,7 +163,7 @@ By default, AURA uses a mock simulated response when running locally without API
    ollama pull nomic-embed-text   # For document embeddings (RAG)
    ```
 
-### Running AURA with Ollama
+### Running OmniMind with Ollama
 Before starting the backend server, set the `USE_OLLAMA` environment variable.
 
 **On Windows (PowerShell):**
@@ -182,4 +182,4 @@ export OLLAMA_EMBED_MODEL="nomic-embed-text"
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-*Warning: If you switch from Gemini to Ollama (or vice versa), the vector dimensions of the embeddings will change. You must delete the local `aura.db` file and restart the server to regenerate the document chunks using the new model!*
+*Warning: If you switch from Gemini to Ollama (or vice versa), the vector dimensions of the embeddings will change. You must delete the local `omnimind.db` file and restart the server to regenerate the document chunks using the new model!*

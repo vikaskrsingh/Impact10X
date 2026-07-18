@@ -2,5 +2,5 @@ venv/
 __pycache__/
 *.pyc
 .env
-aura.db
+omnimind.db
 storage/

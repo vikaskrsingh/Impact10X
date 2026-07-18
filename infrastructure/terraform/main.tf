@@ -13,16 +13,16 @@ provider "google" {
 }
 
 # --- Cloud Storage for Documents ---
-resource "google_storage_bucket" "aura_docs" {
-  name          = "${var.project_id}-aura-documents"
+resource "google_storage_bucket" "omnimind_docs" {
+  name          = "${var.project_id}-omnimind-documents"
   location      = var.region
   force_destroy = true
   uniform_bucket_level_access = true
 }
 
 # --- Cloud SQL (PostgreSQL) ---
-resource "google_sql_database_instance" "aura_db_instance" {
-  name             = "aura-db-instance"
+resource "google_sql_database_instance" "omnimind_db_instance" {
+  name             = "omnimind-db-instance"
   database_version = "POSTGRES_15"
   region           = var.region
 
@@ -32,22 +32,22 @@ resource "google_sql_database_instance" "aura_db_instance" {
   deletion_protection = false
 }
 
-resource "google_sql_database" "aura_db" {
-  name     = "auradb"
-  instance = google_sql_database_instance.aura_db_instance.name
+resource "google_sql_database" "omnimind_db" {
+  name     = "omniminddb"
+  instance = google_sql_database_instance.omnimind_db_instance.name
 }
 
-resource "google_sql_user" "aura_user" {
-  name     = "aura_user"
-  instance = google_sql_database_instance.aura_db_instance.name
+resource "google_sql_user" "omnimind_user" {
+  name     = "omnimind_user"
+  instance = google_sql_database_instance.omnimind_db_instance.name
   password = var.db_password
 }
 
 # --- Artifact Registry ---
-resource "google_artifact_registry_repository" "aura_repo" {
+resource "google_artifact_registry_repository" "omnimind_repo" {
   location      = var.region
-  repository_id = "aura-repo"
-  description   = "Docker repository for AURA frontend and backend"
+  repository_id = "omnimind-repo"
+  description   = "Docker repository for OmniMind frontend and backend"
   format        = "DOCKER"
 }
 
@@ -65,8 +65,8 @@ resource "google_secret_manager_secret_version" "gemini_api_key_version" {
 }
 
 # --- Cloud Run: Backend ---
-resource "google_cloud_run_v2_service" "aura_backend" {
-  name     = "aura-backend"
+resource "google_cloud_run_v2_service" "omnimind_backend" {
+  name     = "omnimind-backend"
   location = var.region
 
   template {
@@ -76,12 +76,12 @@ resource "google_cloud_run_v2_service" "aura_backend" {
       
       env {
         name  = "DATABASE_URL"
-        value = "postgresql://aura_user:${var.db_password}@/auradb?host=/cloudsql/${google_sql_database_instance.aura_db_instance.connection_name}"
+        value = "postgresql://omnimind_user:${var.db_password}@/omniminddb?host=/cloudsql/${google_sql_database_instance.omnimind_db_instance.connection_name}"
       }
       
       env {
         name  = "GCS_BUCKET_NAME"
-        value = google_storage_bucket.aura_docs.name
+        value = google_storage_bucket.omnimind_docs.name
       }
       
       env {
@@ -98,15 +98,15 @@ resource "google_cloud_run_v2_service" "aura_backend" {
     volumes {
       name = "cloudsql"
       cloud_sql_instance {
-        instances = [google_sql_database_instance.aura_db_instance.connection_name]
+        instances = [google_sql_database_instance.omnimind_db_instance.connection_name]
       }
     }
   }
 }
 
 # --- Cloud Run: Frontend ---
-resource "google_cloud_run_v2_service" "aura_frontend" {
-  name     = "aura-frontend"
+resource "google_cloud_run_v2_service" "omnimind_frontend" {
+  name     = "omnimind-frontend"
   location = var.region
 
   template {
@@ -114,7 +114,7 @@ resource "google_cloud_run_v2_service" "aura_frontend" {
       image = "us-docker.pkg.dev/cloudrun/container/hello"
       env {
         name  = "VITE_API_BASE_URL"
-        value = google_cloud_run_v2_service.aura_backend.uri
+        value = google_cloud_run_v2_service.omnimind_backend.uri
       }
     }
   }
@@ -122,16 +122,16 @@ resource "google_cloud_run_v2_service" "aura_frontend" {
 
 # Allow public access to frontend
 resource "google_cloud_run_v2_service_iam_member" "frontend_public_access" {
-  name     = google_cloud_run_v2_service.aura_frontend.name
-  location = google_cloud_run_v2_service.aura_frontend.location
+  name     = google_cloud_run_v2_service.omnimind_frontend.name
+  location = google_cloud_run_v2_service.omnimind_frontend.location
   role     = "roles/run.invoker"
   member   = "allUsers"
 }
 
 # Allow public access to backend (or restrict it to frontend only using CORS/IAM if preferred)
 resource "google_cloud_run_v2_service_iam_member" "backend_public_access" {
-  name     = google_cloud_run_v2_service.aura_backend.name
-  location = google_cloud_run_v2_service.aura_backend.location
+  name     = google_cloud_run_v2_service.omnimind_backend.name
+  location = google_cloud_run_v2_service.omnimind_backend.location
   role     = "roles/run.invoker"
   member   = "allUsers"
 }

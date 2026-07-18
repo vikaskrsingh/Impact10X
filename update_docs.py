@@ -1,7 +1,7 @@
 import sqlite3
 
 def run():
-    conn = sqlite3.connect('aura.db')
+    conn = sqlite3.connect('omnimind.db')
     cursor = conn.cursor()
     # Update agents for the default documents so they show up under our banking agents
     cursor.execute("UPDATE documents SET agent_id = 'compliance' WHERE id = 'doc-1'")

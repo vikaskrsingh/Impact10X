@@ -7,5 +7,5 @@ __pycache__
 *.sqlite
 *.db
 backend/storage/
-backend/aura.db
+backend/omnimind.db
 frontend/dist

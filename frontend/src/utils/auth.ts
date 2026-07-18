@@ -1,7 +1,7 @@
 export type UserRole = "admin" | "expert";
 
-const ROLE_STORAGE_KEY = "aura-user-role";
-const USERNAME_STORAGE_KEY = "aura-username";
+const ROLE_STORAGE_KEY = "omnimind-user-role";
+const USERNAME_STORAGE_KEY = "omnimind-username";
 
 export function getStoredRole(): UserRole | null {
   if (typeof window === "undefined") {

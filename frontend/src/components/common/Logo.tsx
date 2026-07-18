@@ -52,10 +52,10 @@ export default function Logo() {
 
       <div className="flex flex-col justify-center">
         <h1 className="text-2xl font-black tracking-[0.25em] bg-clip-text text-transparent bg-gradient-to-r from-white via-purple-100 to-cyan-200 drop-shadow-[0_0_12px_rgba(255,255,255,0.4)] leading-none group-hover:drop-shadow-[0_0_15px_rgba(168,85,247,0.6)] transition-all duration-500">
-          AURA
+          OmniMind
         </h1>
         <p className="text-[9px] font-bold text-purple-400/80 uppercase tracking-[0.35em] mt-1.5 leading-none group-hover:text-cyan-400/80 transition-colors duration-500">
-          Enterprise AI
+          Knowledge AI
         </p>
       </div>
     </div>

@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { PanelCard } from "../../components/common/PanelCard";
 import { getStoredRole, isAdminRole } from "@/utils/auth";
-import { getDocuments, uploadDocumentFile, uploadDocumentUrl, getAgents, deleteDocument } from "../../services/auraApi";
+import { getDocuments, uploadDocumentFile, uploadDocumentUrl, getAgents, deleteDocument } from "../../services/omnimindApi";
 
 type DocumentItem = {
   id: string;

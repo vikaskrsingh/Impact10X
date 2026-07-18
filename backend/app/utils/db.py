@@ -3,10 +3,10 @@ import os
 from typing import List, Dict, Any, Optional
 
 def get_db_connection():
-    db_path = os.environ.get("DATABASE_URL", "aura.db")
+    db_path = os.environ.get("DATABASE_URL", "omnimind.db")
     if db_path.startswith("postgresql"):
-        # For local testing without docker, fallback to aura.db
-        db_path = "aura.db"
+        # For local testing without docker, fallback to omnimind.db
+        db_path = "omnimind.db"
         
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row

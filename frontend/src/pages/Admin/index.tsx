@@ -1,8 +1,8 @@
 export default function Admin() {
   return (
     <div style={{ padding: "40px" }}>
-      <h1>🚀 Welcome to AURA</h1>
-      <p>Enterprise AI Knowledge Hub</p>
+      <h1>🚀 Welcome to OmniMind</h1>
+      <p>Knowledge AI Hub</p>
     </div>
   );
 }

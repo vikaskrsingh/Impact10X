@@ -1,7 +1,7 @@
 import sqlite3
 
 def run():
-    conn = sqlite3.connect('aura.db')
+    conn = sqlite3.connect('omnimind.db')
     cursor = conn.cursor()
     cursor.execute("INSERT OR IGNORE INTO agents (id, name, owner, health, status) VALUES ('kyc', 'KYC Expert', 'Compliance Team', 98, 'Active')")
     cursor.execute("INSERT OR IGNORE INTO agents (id, name, owner, health, status) VALUES ('aml', 'AML Expert', 'Risk & Compliance', 97, 'Active')")

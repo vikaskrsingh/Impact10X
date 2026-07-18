@@ -1,7 +1,7 @@
 import { Activity, Clock, ShieldCheck, Database, FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import { PanelCard } from "../../components/common/PanelCard";
-import { getRecentActivity, getAgents, type DashboardActivity, type AgentRecord } from "../../services/auraApi";
+import { getRecentActivity, getAgents, type DashboardActivity, type AgentRecord } from "../../services/omnimindApi";
 import { motion } from "framer-motion";
 
 export default function Analytics() {

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .utils.db import init_db
 from .api import agents, documents, chat, dashboard
 
-app = FastAPI(title="AURA API")
+app = FastAPI(title="OmniMind API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -35,4 +35,4 @@ app.include_router(dashboard.router)
 
 @app.get("/")
 def health():
-    return {"application": "AURA", "status": "Running"}
+    return {"application": "OmniMind", "status": "Running"}

@@ -1,6 +1,6 @@
-# AURA Detailed Documentation
+# OmniMind Detailed Documentation
 
-AURA is a sophisticated, enterprise-grade AI knowledge platform designed specifically to streamline and augment European banking workflows. It leverages cutting-edge Retrieval-Augmented Generation (RAG) techniques alongside specialized AI agents to deliver highly contextual, secure, and accurate intelligence to end users.
+OmniMind is a sophisticated, enterprise-grade AI knowledge platform designed specifically to streamline and augment European banking workflows. It leverages cutting-edge Retrieval-Augmented Generation (RAG) techniques alongside specialized AI agents to deliver highly contextual, secure, and accurate intelligence to end users.
 
 ---
 
@@ -43,11 +43,11 @@ flowchart TB
     DocProcessor -->|Store Vectors| DB
 ```
 
-AURA follows a decoupled, modern web application architecture consisting of a frontend client and a backend API server.
+OmniMind follows a decoupled, modern web application architecture consisting of a frontend client and a backend API server.
 
 - **Frontend (Client)**: A Single Page Application (SPA) responsible for all user interactions, UI rendering, routing, and state management. It communicates with the backend exclusively via RESTful JSON APIs.
 - **Backend (API Layer)**: A robust, high-performance API that handles business logic, database transactions, vector embedding generation, and large language model (LLM) orchestration.
-- **Data Layer (Storage)**: Relational data (users, agents, chat history, document metadata) and vector embeddings (for RAG) are currently stored in a local SQLite database (`aura.db`). This can easily be migrated to PostgreSQL (e.g., Google Cloud SQL) for production.
+- **Data Layer (Storage)**: Relational data (users, agents, chat history, document metadata) and vector embeddings (for RAG) are currently stored in a local SQLite database (`omnimind.db`). This can easily be migrated to PostgreSQL (e.g., Google Cloud SQL) for production.
 - **AI Inference Layer**: The system abstracts AI inference, allowing it to toggle seamlessly between cloud-based models (like Google Gemini) and private, local models (like Ollama's `llama3`).
 
 ---
@@ -79,7 +79,7 @@ The application enforces strict routing boundaries based on user roles:
 - **Protected Routes**: Unauthenticated users are strictly barred from the application and seamlessly redirected to the Login screen.
 
 ### Domain-Specific AI Agents
-AURA is pre-configured with specialized agents representing different banking domains:
+OmniMind is pre-configured with specialized agents representing different banking domains:
 - **KYC Expert** (Know Your Customer)
 - **AML Expert** (Anti-Money Laundering)
 - **Compliance Expert**
@@ -89,7 +89,7 @@ AURA is pre-configured with specialized agents representing different banking do
 Each agent maintains its own separate knowledge base (RAG vector space), ensuring that answers are domain-specific and avoid cross-contamination of unrelated banking regulations.
 
 ### The AI Workspace (Chat Interface)
-The core operational screen of AURA. It provides:
+The core operational screen of OmniMind. It provides:
 - **Real-Time Streaming**: Responses stream in token-by-token for a fast, responsive feel.
 - **Document Citations**: The AI explicitly lists the source documents it used to generate its answer (e.g., `AML_Policy_2026.pdf`), building trust and auditability.
 - **Dynamic Confidence Scoring**: Every response is tagged with a confidence score (e.g., `Confidence Score 98%`). This score is tied directly to the agent's underlying "health" metric in the database.
@@ -105,7 +105,7 @@ Administrators use this module to enrich the AI's intelligence:
 
 ## 4. Database Schema (High-Level)
 
-The SQLite database (`aura.db`) consists of several core tables:
+The SQLite database (`omnimind.db`) consists of several core tables:
 
 1. **`agents`**: 
    - Stores configuration for each AI expert.
@@ -121,7 +121,7 @@ The SQLite database (`aura.db`) consists of several core tables:
 
 ## 5. Deployment Strategy
 
-AURA is built to be cloud-native and decoupled:
+OmniMind is built to be cloud-native and decoupled:
 - **Frontend**: Compiled to static HTML/CSS/JS via `npm run build` and deployed to a CDN (e.g., Firebase Hosting, Vercel, or Google Cloud Storage).
 - **Backend**: Containerized using the provided `Dockerfile` and deployed to a serverless container platform (e.g., Google Cloud Run).
 - **Database**: Migrated from SQLite to a managed PostgreSQL instance (e.g., Cloud SQL) for persistent, concurrent production storage.

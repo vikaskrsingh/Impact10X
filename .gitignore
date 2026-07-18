@@ -28,7 +28,7 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
-aura.db
+omnimind.db
 .env
 .env.*
 !.env.example
@@ -70,4 +70,4 @@ backend/uploads/
 backend/*.db
 backend/*.sqlite
 backend/*.sqlite3
-backend/aura.db
+backend/omnimind.db

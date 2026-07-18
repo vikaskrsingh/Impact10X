@@ -18,8 +18,8 @@ import { Button } from "@/components/ui/button";
 import { MetricCard, PanelCard } from "../components/common/PanelCard";
 import { getStoredRole, isAdminRole, getStoredUsername } from "@/utils/auth";
 import { useEffect, useState } from "react";
-import { getDashboardStats, getRecentActivity, getRecentUploads } from "../services/auraApi";
-import type { DashboardStats, DashboardActivity, DashboardUpload } from "../services/auraApi";
+import { getDashboardStats, getRecentActivity, getRecentUploads } from "../services/omnimindApi";
+import type { DashboardStats, DashboardActivity, DashboardUpload } from "../services/omnimindApi";
 
 export default function Dashboard() {
   const role = getStoredRole();

@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SendHorizonal, Loader2, User, FileJson, ThumbsUp, ThumbsDown, Trash2, ChevronDown } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { askExpert, getAgents, getDocuments, submitChatFeedback } from "../../services/auraApi";
+import { askExpert, getAgents, getDocuments, submitChatFeedback } from "../../services/omnimindApi";
 
 type Message = {
   role: "assistant" | "user";
@@ -558,7 +558,7 @@ export default function Workspace() {
                 { label: "Owner", value: selectedExpert.owner },
                 { label: "Created", value: todayString },
                 { label: "Last Updated", value: selectedExpert.stats.updated },
-                { label: "Model", value: "AURA Core v2.1" },
+                { label: "Model", value: "OmniMind Core v2.1" },
                 { label: "Data Sources", value: referenceDocuments.length.toString() },
                 { label: "Access", value: "All Internal Users" },
               ].map((info) => (
