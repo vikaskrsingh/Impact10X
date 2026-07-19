@@ -21,6 +21,35 @@ OmniMind is a knowledge AI platform designed for European banking workflows. It 
 - `backend/Dockerfile` - Production configuration for Google Cloud Run
 - `frontend/firebase.json` - Production configuration for Firebase Hosting
 
+## API Endpoints
+
+The FastAPI backend exposes 15 distinct API endpoints to power the application:
+
+### 🧠 Agents API (`/agents`)
+- `GET /agents` - Fetch all expert agents
+- `POST /agents` - Create a new expert agent
+- `DELETE /agents/{agent_id}` - Delete an expert agent
+
+### 📄 Documents API (`/documents`)
+- `GET /documents` - List all uploaded documents
+- `POST /documents` - Create a document record
+- `POST /documents/upload` - Upload a physical file (e.g., PDF) and process it for RAG
+- `POST /documents/url` - Ingest knowledge from a web URL
+- `DELETE /documents/{doc_id}` - Delete a document and its vector embeddings
+
+### 💬 Chat API (`/chat`)
+- `POST /chat` - Standard (synchronous) chat with an expert agent
+- `POST /chat/stream` - Real-time streaming chat endpoint (SSE)
+- `POST /chat/{message_id}/feedback` - Submit helpful/not-helpful feedback on an answer
+
+### 📊 Dashboard API (`/dashboard`)
+- `GET /dashboard/stats` - Get top-level dashboard metrics
+- `GET /dashboard/recent-uploads` - Get the latest document uploads for the feed
+- `GET /dashboard/recent-activity` - Get the recent system activity feed
+
+### 🌐 Root/System
+- `GET /` - Healthcheck endpoint to verify the API is running
+
 ## Prerequisites
 
 - Node.js 18+ and npm

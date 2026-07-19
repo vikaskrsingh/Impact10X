@@ -3,7 +3,9 @@ from ..schemas.chat import ChatRequest, ChatResponse, ChatFeedbackRequest
 from ..utils.db import fetch_agents, insert_chat_interaction, update_chat_feedback
 from ..rag.vector_store import retrieve_context
 from ..agents.prompts import get_system_prompt
-from ..services.llm import generate_grounded_answer
+from ..services.llm import generate_grounded_answer, generate_grounded_answer_stream
+from fastapi.responses import StreamingResponse
+import json
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -75,6 +77,66 @@ def chat_with_expert(payload: ChatRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate answer: {e}"
+        )
+
+@router.post("/stream")
+def chat_stream(payload: ChatRequest):
+    try:
+        agents = fetch_agents()
+        agent = next((a for a in agents if a["id"] == payload.expertId), None)
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Expert Agent with ID '{payload.expertId}' not found."
+            )
+            
+        context_chunks = retrieve_context(payload.expertId, payload.question, top_k=3)
+        system_prompt = get_system_prompt(payload.expertId)
+        
+        sources = list(set([chunk["document_id"] for chunk in context_chunks if chunk.get("document_id")]))
+        if not sources:
+            sources = ["System Knowledge Base"]
+            
+        from ..utils.db import fetch_documents
+        doc_records = fetch_documents(payload.expertId)
+        doc_id_to_name = {d["id"]: d["name"] for d in doc_records}
+        
+        resolved_sources = []
+        for src_id in sources:
+            resolved_sources.append(doc_id_to_name.get(src_id, src_id))
+
+        def event_generator():
+            # Send initial metadata
+            metadata = {
+                "type": "metadata",
+                "sources": resolved_sources,
+                "confidenceScore": agent["health"],
+                "expert": agent["name"]
+            }
+            yield f"data: {json.dumps(metadata)}\n\n"
+            
+            full_answer = ""
+            for chunk in generate_grounded_answer_stream(system_prompt, payload.question, context_chunks):
+                full_answer += chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
+                
+            # Log interaction after stream finishes
+            msg_id = insert_chat_interaction(
+                agent_id=payload.expertId,
+                user_message=payload.question,
+                assistant_message=full_answer
+            )
+            
+            yield f"data: {json.dumps({'type': 'done', 'id': msg_id})}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate answer stream: {e}"
         )
 
 @router.post("/{message_id}/feedback", status_code=status.HTTP_200_OK)

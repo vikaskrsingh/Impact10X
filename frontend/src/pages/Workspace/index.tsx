@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SendHorizonal, Loader2, User, FileJson, ThumbsUp, ThumbsDown, Trash2, ChevronDown } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { askExpert, getAgents, getDocuments, submitChatFeedback } from "../../services/omnimindApi";
+import { askExpert, streamExpert, getAgents, getDocuments, submitChatFeedback } from "../../services/omnimindApi";
 
 type Message = {
   role: "assistant" | "user";
@@ -249,37 +249,86 @@ export default function Workspace() {
       setIsTyping(false);
     } else {
       try {
-        const response = await askExpert(selectedExpertId, trimmed);
         const resTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // Add placeholder message for assistant
         setThreads((current) => ({
           ...current,
           [selectedExpertId]: [
             ...(current[selectedExpertId] ?? []),
             {
               role: "assistant",
-              text: response.answer,
-              sources: response.sources,
-              timestamp: resTimestamp,
-              id: response.id,
-              confidenceScore: response.confidenceScore,
-              feedbackStatus: null
-            },
-          ],
-        }));
-      } catch (_error) {
-        const resTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        console.error("Unable to ask expert", _error);
-        setThreads((current) => ({
-          ...current,
-          [selectedExpertId]: [
-            ...(current[selectedExpertId] ?? []),
-            {
-              role: "assistant",
-              text: "The expert service is temporarily unavailable. Please retry in a moment.",
+              text: "",
               timestamp: resTimestamp
             },
           ],
         }));
+
+        await streamExpert(
+          selectedExpertId,
+          trimmed,
+          (metadata) => {
+            setThreads((current) => {
+              const threads = [...(current[selectedExpertId] ?? [])];
+              const lastIndex = threads.length - 1;
+              if (lastIndex >= 0) {
+                threads[lastIndex] = {
+                  ...threads[lastIndex],
+                  sources: metadata.sources,
+                  confidenceScore: metadata.confidenceScore,
+                };
+              }
+              return { ...current, [selectedExpertId]: threads };
+            });
+          },
+          (textChunk) => {
+            setThreads((current) => {
+              const threads = [...(current[selectedExpertId] ?? [])];
+              const lastIndex = threads.length - 1;
+              if (lastIndex >= 0) {
+                threads[lastIndex] = {
+                  ...threads[lastIndex],
+                  text: threads[lastIndex].text + textChunk
+                };
+              }
+              return { ...current, [selectedExpertId]: threads };
+            });
+          },
+          (msgId) => {
+            setThreads((current) => {
+              const threads = [...(current[selectedExpertId] ?? [])];
+              const lastIndex = threads.length - 1;
+              if (lastIndex >= 0) {
+                threads[lastIndex] = {
+                  ...threads[lastIndex],
+                  id: msgId,
+                  feedbackStatus: null
+                };
+              }
+              return { ...current, [selectedExpertId]: threads };
+            });
+          }
+        );
+      } catch (_error) {
+        const resTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        console.error("Unable to ask expert", _error);
+        setThreads((current) => {
+          const threads = [...(current[selectedExpertId] ?? [])];
+          const lastIndex = threads.length - 1;
+          if (lastIndex >= 0 && threads[lastIndex].text === "") {
+            // Replace the empty placeholder with error message
+            threads[lastIndex] = {
+              ...threads[lastIndex],
+              text: "The expert service is temporarily unavailable. Please retry in a moment."
+            };
+          } else {
+            threads.push({
+              role: "assistant",
+              text: "The expert service is temporarily unavailable. Please retry in a moment.",
+              timestamp: resTimestamp
+            });
+          }
+          return { ...current, [selectedExpertId]: threads };
+        });
       } finally {
         setIsTyping(false);
       }
