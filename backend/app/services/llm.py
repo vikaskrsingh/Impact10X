@@ -1,11 +1,12 @@
-import os
 from typing import List
 from google import genai
 from google.genai import types
 import ollama
 
+from ..core.config import settings
+
 def get_gemini_client():
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = settings.GEMINI_API_KEY
     if api_key:
         try:
             return genai.Client(api_key=api_key)
@@ -14,7 +15,7 @@ def get_gemini_client():
     return None
 
 def is_ollama_enabled() -> bool:
-    return os.environ.get("USE_OLLAMA", "false").lower() == "true"
+    return settings.USE_OLLAMA
 
 def generate_grounded_answer(
     system_prompt: str,
@@ -39,7 +40,7 @@ def generate_grounded_answer(
 
     if use_ollama:
         try:
-            model_name = os.environ.get("OLLAMA_CHAT_MODEL", "llama3")
+            model_name = settings.OLLAMA_CHAT_MODEL
             response = ollama.chat(
                 model=model_name,
                 messages=[
@@ -53,9 +54,8 @@ def generate_grounded_answer(
             
     elif client:
         try:
-            # Use gemini-2.5-flash or fallback to gemini-1.5-flash
             response = client.models.generate_content(
-                model='gemini-3.5-flash',
+                model=settings.GEMINI_CHAT_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt,
@@ -133,7 +133,7 @@ def generate_grounded_answer_stream(
 
     if use_ollama:
         try:
-            model_name = os.environ.get("OLLAMA_CHAT_MODEL", "llama3")
+            model_name = settings.OLLAMA_CHAT_MODEL
             response = ollama.chat(
                 model=model_name,
                 messages=[
@@ -151,9 +151,8 @@ def generate_grounded_answer_stream(
             
     elif client:
         try:
-            # Use gemini-2.5-flash or fallback to gemini-1.5-flash
             response_stream = client.models.generate_content_stream(
-                model='gemini-3.5-flash',
+                model=settings.GEMINI_CHAT_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=system_prompt,

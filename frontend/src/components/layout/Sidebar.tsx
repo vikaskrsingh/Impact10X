@@ -1,5 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { getStoredRole, getStoredUsername } from "@/utils/auth";
+import { getAgents } from "../../services/omnimindApi";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Home, 
@@ -15,7 +17,8 @@ import {
   Database,
   UserCog,
   Settings,
-  ClipboardList
+  ClipboardList,
+  Bot
 } from "lucide-react";
 import Logo from "../common/Logo";
 
@@ -25,15 +28,52 @@ export default function Sidebar() {
   const username = getStoredUsername() || (role === "admin" ? "System Administrator" : "Compliance Analyst");
   const isAdmin = role === "admin";
 
-  const aiExperts = [
-    { id: "kyc", title: "KYC Expert", desc: "Know Your Customer", icon: UserSquare2, color: "text-purple-400 bg-purple-400/10" },
-    { id: "aml", title: "AML Expert", desc: "Anti Money Laundering", icon: ShieldCheck, color: "text-emerald-400 bg-emerald-400/10" },
-    { id: "compliance", title: "Compliance Expert", desc: "Regulatory Compliance", icon: FileCheck, color: "text-blue-400 bg-blue-400/10" },
-    { id: "payments", title: "Payments Expert", desc: "Payments & Transfers", icon: Landmark, color: "text-amber-400 bg-amber-400/10" },
-    { id: "risk", title: "Risk Expert", desc: "Enterprise Risk", icon: AlertTriangle, color: "text-rose-400 bg-rose-400/10" },
-    { id: "esg", title: "ESG Expert", desc: "Environmental, Social, Governance", icon: Leaf, color: "text-green-500 bg-green-500/10" },
-    { id: "wealth", title: "Wealth Expert", desc: "Wealth Management", icon: Gem, color: "text-fuchsia-400 bg-fuchsia-400/10" },
-  ];
+  const [aiExperts, setAiExperts] = useState<{ id: string; title: string; desc: string; icon: any; color: string }[]>([]);
+
+  useEffect(() => {
+    const fetchAgents = async () => {
+      try {
+        const agents = await getAgents();
+        const colors = [
+          "text-purple-400 bg-purple-400/10",
+          "text-emerald-400 bg-emerald-400/10",
+          "text-blue-400 bg-blue-400/10",
+          "text-amber-400 bg-amber-400/10",
+          "text-rose-400 bg-rose-400/10",
+          "text-green-500 bg-green-500/10",
+          "text-fuchsia-400 bg-fuchsia-400/10",
+        ];
+        
+        const iconMap: Record<string, any> = {
+          kyc: UserSquare2,
+          aml: ShieldCheck,
+          compliance: FileCheck,
+          payments: Landmark,
+          risk: AlertTriangle,
+          esg: Leaf,
+          wealth: Gem,
+        };
+
+        const formattedAgents = agents.map((agent, i) => {
+          const matchedIcon = iconMap[agent.id.toLowerCase()] || Bot;
+          return {
+            id: agent.id,
+            title: agent.name,
+            desc: agent.owner,
+            icon: matchedIcon,
+            color: colors[i % colors.length],
+          };
+        });
+        setAiExperts(formattedAgents);
+      } catch (err) {
+        console.error("Failed to load agents in sidebar", err);
+      }
+    };
+
+    fetchAgents();
+    window.addEventListener("agentsUpdated", fetchAgents);
+    return () => window.removeEventListener("agentsUpdated", fetchAgents);
+  }, []);
 
   const adminLinks = [
     { title: "Manage Agents", path: "/experts", icon: Users },

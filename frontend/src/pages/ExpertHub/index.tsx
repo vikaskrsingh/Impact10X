@@ -34,8 +34,8 @@ export default function ExpertHub() {
   }, [searchParams]);
 
   const filteredExperts = experts.filter(
-    (expert) => 
-      expert.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (expert) =>
+      expert.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       expert.owner.toLowerCase().includes(searchQuery.toLowerCase())
   );
   const role = getStoredRole();
@@ -82,7 +82,8 @@ export default function ExpertHub() {
         status: newExpert.status,
       }, ...current]);
       setNewName("");
-      setNewOwner("Risk");
+      setNewOwner("Compliance Team");
+      window.dispatchEvent(new Event('agentsUpdated'));
     } catch (error) {
       console.error("Unable to create expert", error);
     }
@@ -93,6 +94,7 @@ export default function ExpertHub() {
     try {
       await deleteAgent(id);
       setExperts((current) => current.filter((expert) => expert.id !== id));
+      window.dispatchEvent(new Event('agentsUpdated'));
     } catch (error) {
       console.error("Unable to delete expert", error);
     }
@@ -108,7 +110,7 @@ export default function ExpertHub() {
         </div>
         {isAdmin ? (
           <div className="flex items-center gap-2">
-            <Input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="New expert name" className="w-48 bg-transparent border-white/10 text-slate-200 focus:border-purple-500/50 placeholder:text-slate-500" />
+            <Input value={newName} onChange={(event) => setNewName(event.target.value)} placeholder="New AI Agent name" className="w-48 bg-transparent border-white/10 text-slate-200 focus:border-purple-500/50 placeholder:text-slate-500" />
             <select value={newOwner} onChange={(event) => setNewOwner(event.target.value)} className="rounded-md border border-white/10 bg-[#131825] px-3 py-2 text-sm text-slate-300 focus:border-purple-500/50 focus:outline-none">
               <option value="Compliance Team">Compliance Team</option>
               <option value="Risk & Compliance">Risk & Compliance</option>
@@ -119,7 +121,7 @@ export default function ExpertHub() {
               <option value="Wealth Management">Wealth Management</option>
             </select>
             <button onClick={() => void handleCreate()} className="rounded-md bg-purple-600 px-4 py-2 text-sm font-semibold text-white transition duration-300 hover:bg-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.4)] hover:shadow-[0_0_25px_rgba(168,85,247,0.6)]">
-              Create expert
+              Create AI Agent
             </button>
           </div>
         ) : null}
@@ -128,11 +130,11 @@ export default function ExpertHub() {
       <div className="flex flex-col gap-3 rounded-2xl border border-white/5 bg-[#131825] p-4 shadow-sm lg:flex-row lg:items-center lg:justify-between transition hover:bg-white/5">
         <div className="relative max-w-xl flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input 
+          <Input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search experts by domain or owner" 
-            className="pl-9 bg-transparent border-white/10 text-slate-200 focus:border-purple-500/50 placeholder:text-slate-500" 
+            placeholder="Search experts by domain or owner"
+            className="pl-9 bg-transparent border-white/10 text-slate-200 focus:border-purple-500/50 placeholder:text-slate-500"
           />
         </div>
         <div className="flex items-center gap-2 text-sm text-slate-400">

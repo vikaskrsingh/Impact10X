@@ -1,5 +1,4 @@
 import json
-import os
 import re
 import math
 from collections import Counter
@@ -7,6 +6,7 @@ from typing import List, Dict, Any, Optional
 import concurrent.futures
 from google import genai
 import ollama
+from ..core.config import settings
 from ..utils.db import insert_document_chunks, fetch_chunks_by_agent, update_document_status
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
@@ -43,7 +43,7 @@ def compute_local_similarity(query_tokens: List[str], chunk_text: str) -> float:
     return numerator / denominator
 
 def get_gemini_client() -> Optional[genai.Client]:
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = settings.GEMINI_API_KEY
     if api_key:
         try:
             return genai.Client(api_key=api_key)
@@ -52,13 +52,13 @@ def get_gemini_client() -> Optional[genai.Client]:
     return None
 
 def is_ollama_enabled() -> bool:
-    return os.environ.get("USE_OLLAMA", "false").lower() == "true"
+    return settings.USE_OLLAMA
 
 def _embed_chunk(idx: int, chunk: str, use_ollama: bool, client: Optional[genai.Client]) -> Dict[str, Any]:
     embedding_str = None
     if use_ollama:
         try:
-            model_name = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+            model_name = settings.OLLAMA_EMBED_MODEL
             response = ollama.embeddings(model=model_name, prompt=chunk)
             embedding_str = json.dumps(response["embedding"])
         except Exception as e:
@@ -66,7 +66,7 @@ def _embed_chunk(idx: int, chunk: str, use_ollama: bool, client: Optional[genai.
     elif client:
         try:
             response = client.models.embed_content(
-                model='text-embedding-004',
+                model=settings.GEMINI_EMBED_MODEL,
                 contents=chunk
             )
             embedding_str = json.dumps(response.embeddings[0].values)
@@ -136,12 +136,12 @@ def retrieve_context(agent_id: str, query: str, top_k: int = 3) -> List[Dict[str
         try:
             query_embedding = None
             if use_ollama:
-                model_name = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+                model_name = settings.OLLAMA_EMBED_MODEL
                 response = ollama.embeddings(model=model_name, prompt=query)
                 query_embedding = response["embedding"]
             else:
                 response = client.models.embed_content(
-                    model='text-embedding-004',
+                    model=settings.GEMINI_EMBED_MODEL,
                     contents=query
                 )
                 query_embedding = response.embeddings[0].values

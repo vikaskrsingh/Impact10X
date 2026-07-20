@@ -6,6 +6,7 @@ from ..schemas.document import DocumentCreate, DocumentResponse
 from ..utils.db import fetch_documents, insert_document, update_agent_status
 from ..rag.vector_store import index_document
 from ..rag.parser import parse_file
+from ..core.config import settings
 from google.cloud import storage
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -13,7 +14,7 @@ router = APIRouter(prefix="/documents", tags=["documents"])
 STORAGE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "storage")
 os.makedirs(STORAGE_DIR, exist_ok=True)
 
-GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME")
+GCS_BUCKET_NAME = settings.GCS_BUCKET_NAME or None
 storage_client = storage.Client() if GCS_BUCKET_NAME else None
 
 @router.get("", response_model=List[DocumentResponse])
