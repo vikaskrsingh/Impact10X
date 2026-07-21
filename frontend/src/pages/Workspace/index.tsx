@@ -77,18 +77,19 @@ const expertDocuments: Record<string, ReferenceDocument[]> = {
     { name: "Investment Suitability Matrix.pdf", confidence: "95%", type: "pdf", page: 2 },
   ]
 };
+const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const defaultThreads: Record<string, Message[]> = {
   kyc: [
     {
       role: "assistant",
-      text: "For corporate clients in Germany, the following documents are acceptable as Proof of Address:\n\n1. Recent utility bill (electricity, gas, water, or telecom) not older than 3 months\n2. Bank statement not older than 3 months\n3. Commercial lease agreement\n4. Property tax statement\n5. Official government correspondence issued within the last 3 months\n\nThe document must clearly show the company name and registered address. P.O. Box addresses are not accepted.",
-      sources: ["KYC Policy v4.1.pdf", "German Regulatory Circular.pdf", "Proof of Address Guidelines.docx"],
-      timestamp: "10:32 AM"
+      text: "I am ready to assist with KYC policies and procedures. How can I help?",
+      // sources: ["KYC Policy v4.1.pdf", "German Regulatory Circular.pdf", "Proof of Address Guidelines.docx"],
+      timestamp: currentTime
     },
   ],
   aml: [
-    { role: "assistant", text: "I am ready to assist with AML transaction monitoring and suspicious activity reporting. How can I help?", sources: ["AML Transaction Monitoring.pdf"], timestamp: "09:00 AM" },
+    { role: "assistant", text: "I am ready to assist with AML transaction monitoring and suspicious activity reporting. How can I help?", sources: ["AML Transaction Monitoring.pdf"], timestamp: currentTime },
   ],
   multi: [],
 };
@@ -165,7 +166,9 @@ export default function Workspace() {
             const found = mappedExperts.find(m => m.id === p.id);
             return found ? { ...p, owner: found.owner, name: found.name } : p;
           });
-          return merged;
+
+          const newAgents = mappedExperts.filter(m => !prev.some(p => p.id === m.id));
+          return [...merged, ...newAgents];
         });
       }
     } catch (error) {

@@ -41,6 +41,9 @@ class Settings:
     # ── Cloud storage (optional) ──────────────────────────────────────
     GCS_BUCKET_NAME: str = os.environ.get("GCS_BUCKET_NAME", "")
 
+    # ── Image Generation ──────────────────────────────────────────────
+    ENABLE_IMAGE_GENERATION: bool = os.environ.get("ENABLE_IMAGE_GENERATION", "false").lower() == "true"
+
 
 # Singleton instance used across the application
 settings = Settings()

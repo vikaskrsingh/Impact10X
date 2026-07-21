@@ -2,6 +2,9 @@ from typing import List
 from google import genai
 from google.genai import types
 import ollama
+import re
+import os
+import uuid
 
 from ..core.config import settings
 
@@ -16,6 +19,40 @@ def get_gemini_client():
 
 def is_ollama_enabled() -> bool:
     return settings.USE_OLLAMA
+
+def process_image_prompts(response_text: str, client) -> str:
+    if not settings.ENABLE_IMAGE_GENERATION or not client:
+        return response_text
+
+    pattern = r'\[IMAGE_PROMPT:\s*(.*?)\]'
+    
+    def replacer(match):
+        prompt = match.group(1)
+        public_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "frontend", "public", "images")
+        os.makedirs(public_dir, exist_ok=True)
+        try:
+            print(f"Generating image for prompt: {prompt}")
+            result = client.models.generate_images(
+                model='imagen-3.0-generate-002',
+                prompt=prompt,
+                config=types.GenerateImagesConfig(
+                    number_of_images=1,
+                    aspect_ratio="16:9"
+                )
+            )
+            for generated_image in result.generated_images:
+                filename = f"gen_{uuid.uuid4().hex[:8]}.png"
+                filepath = os.path.join(public_dir, filename)
+                
+                with open(filepath, "wb") as f:
+                    f.write(generated_image.image.image_bytes)
+                
+                return f"![Generated Image](/images/{filename})"
+        except Exception as e:
+            print(f"Error generating image: {e}")
+        return match.group(0)
+
+    return re.sub(pattern, replacer, response_text, flags=re.IGNORECASE)
 
 def generate_grounded_answer(
     system_prompt: str,
@@ -34,6 +71,20 @@ def generate_grounded_answer(
     prompt = (
         f"Use the following source contexts to answer the question. Make sure to ground your answer "
         f"strictly in the source contexts provided below. If you use information from a source, cite the source name.\n\n"
+        f"IMPORTANT FORMATTING REQUIREMENT:\n"
+        f"You must format your entire response as a highly structured, formal markdown document. "
+        f"Use appropriate markdown elements such as Headings (##), Subheadings (###), Tables, Bullet points, "
+        f"and Bold text to organize the information clearly and professionally. Do not return plain conversational text.\n\n"
+    )
+    
+    if settings.ENABLE_IMAGE_GENERATION:
+        prompt += (
+            f"If the user explicitly asks for an image, or if the context warrants a visual representation, "
+            f"generate an image prompt and enclose it in exactly this format: [IMAGE_PROMPT: <detailed description of the image>]. "
+            f"For example: [IMAGE_PROMPT: A professional pie chart showing corporate risk distribution].\n\n"
+        )
+        
+    prompt += (
         f"Retrieved Context:\n{formatted_context}\n"
         f"Question: {user_question}"
     )
@@ -48,7 +99,7 @@ def generate_grounded_answer(
                     {'role': 'user', 'content': prompt}
                 ]
             )
-            return response['message']['content']
+            return process_image_prompts(response['message']['content'], client)
         except Exception as e:
             print(f"Error during Ollama generation: {e}. Falling back to simulated generation.")
             
@@ -62,7 +113,7 @@ def generate_grounded_answer(
                     temperature=0.1
                 )
             )
-            return response.text
+            return process_image_prompts(response.text, client)
         except Exception as e:
             print(f"Error during Gemini generation: {e}. Falling back to simulated generation.")
             
@@ -108,7 +159,7 @@ def generate_grounded_answer(
         f"{joined_sentences}\n\n"
         f"For real LLM reasoning, please set USE_OLLAMA=true or the GEMINI_API_KEY environment variable."
     )
-    return answer
+    return process_image_prompts(answer, client)
 
 def generate_grounded_answer_stream(
     system_prompt: str,
