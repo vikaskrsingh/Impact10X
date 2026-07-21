@@ -77,18 +77,19 @@ const expertDocuments: Record<string, ReferenceDocument[]> = {
     { name: "Investment Suitability Matrix.pdf", confidence: "95%", type: "pdf", page: 2 },
   ]
 };
+const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const defaultThreads: Record<string, Message[]> = {
   kyc: [
     {
       role: "assistant",
-      text: "For corporate clients in Germany, the following documents are acceptable as Proof of Address:\n\n1. Recent utility bill (electricity, gas, water, or telecom) not older than 3 months\n2. Bank statement not older than 3 months\n3. Commercial lease agreement\n4. Property tax statement\n5. Official government correspondence issued within the last 3 months\n\nThe document must clearly show the company name and registered address. P.O. Box addresses are not accepted.",
-      sources: ["KYC Policy v4.1.pdf", "German Regulatory Circular.pdf", "Proof of Address Guidelines.docx"],
-      timestamp: "10:32 AM"
+      text: "I am ready to assist with KYC policies and procedures. How can I help?",
+      // sources: ["KYC Policy v4.1.pdf", "German Regulatory Circular.pdf", "Proof of Address Guidelines.docx"],
+      timestamp: currentTime
     },
   ],
   aml: [
-    { role: "assistant", text: "I am ready to assist with AML transaction monitoring and suspicious activity reporting. How can I help?", sources: ["AML Transaction Monitoring.pdf"], timestamp: "09:00 AM" },
+    { role: "assistant", text: "I am ready to assist with AML transaction monitoring and suspicious activity reporting. How can I help?", sources: ["AML Transaction Monitoring.pdf"], timestamp: currentTime },
   ],
   multi: [],
 };
@@ -103,7 +104,9 @@ export default function Workspace() {
   const [showSources, setShowSources] = useState(true);
   const [multiAgentMode, setMultiAgentMode] = useState(false);
   const [selectedMultiAgents, setSelectedMultiAgents] = useState<string[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [promptHistory, setPromptHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const expertParam = searchParams.get("expert") ?? "kyc";
   const selectedExpertId = experts.some((e) => e.id === expertParam) ? expertParam : "kyc";
@@ -139,7 +142,12 @@ export default function Workspace() {
   }, [selectedExpertId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth"
+      });
+    }
   }, [threads, isTyping, searchParams]);
 
   const loadExperts = async () => {
@@ -158,7 +166,9 @@ export default function Workspace() {
             const found = mappedExperts.find(m => m.id === p.id);
             return found ? { ...p, owner: found.owner, name: found.name } : p;
           });
-          return merged;
+
+          const newAgents = mappedExperts.filter(m => !prev.some(p => p.id === m.id));
+          return [...merged, ...newAgents];
         });
       }
     } catch (error) {
@@ -200,6 +210,9 @@ export default function Workspace() {
 
     const userMessage: Message = { role: "user", text: trimmed, timestamp };
     const threadId = multiAgentMode ? "multi" : selectedExpertId;
+
+    setPromptHistory((prev) => [...prev, trimmed]);
+    setHistoryIndex(-1);
 
     setThreads((current) => ({
       ...current,
@@ -355,7 +368,7 @@ export default function Workspace() {
   const todayString = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4">
+    <div className="flex flex-col flex-1 min-h-0 space-y-4">
       {/* EXPERT TOP BANNER (FLATTENED) */}
       <div className="shrink-0 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5">
         <div className="flex items-center gap-5 relative z-10">
@@ -422,7 +435,7 @@ export default function Workspace() {
           </div>
 
           {/* Chat History */}
-          <div className="flex-1 overflow-y-auto p-6 space-y-6 z-10 scroll-smooth custom-scrollbar">
+          <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-6 space-y-6 z-10 scroll-smooth custom-scrollbar">
             <AnimatePresence initial={false}>
               {activeMessages.map((message, index) => (
                 <motion.div
@@ -494,7 +507,6 @@ export default function Workspace() {
                 </motion.div>
               )}
             </AnimatePresence>
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Chat Input Area */}
@@ -515,8 +527,8 @@ export default function Workspace() {
                           );
                         }}
                         className={`text-xs px-3 py-1.5 rounded-full border transition-colors ${isSelected
-                            ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
-                            : 'bg-[#131825] border-white/10 text-slate-400 hover:text-slate-300 hover:border-white/20'
+                          ? 'bg-purple-500/20 border-purple-500/50 text-purple-300'
+                          : 'bg-[#131825] border-white/10 text-slate-400 hover:text-slate-300 hover:border-white/20'
                           }`}
                       >
                         {expert.name}
@@ -547,6 +559,25 @@ export default function Workspace() {
                   if (event.key === "Enter" && !event.shiftKey) {
                     event.preventDefault();
                     void handleSend();
+                  } else if (event.key === "ArrowUp") {
+                    if (promptHistory.length > 0) {
+                      event.preventDefault();
+                      const nextIndex = historyIndex === -1 ? promptHistory.length - 1 : Math.max(0, historyIndex - 1);
+                      setHistoryIndex(nextIndex);
+                      setDraft(promptHistory[nextIndex]);
+                    }
+                  } else if (event.key === "ArrowDown") {
+                    if (historyIndex !== -1) {
+                      event.preventDefault();
+                      const nextIndex = historyIndex + 1;
+                      if (nextIndex >= promptHistory.length) {
+                        setHistoryIndex(-1);
+                        setDraft("");
+                      } else {
+                        setHistoryIndex(nextIndex);
+                        setDraft(promptHistory[nextIndex]);
+                      }
+                    }
                   }
                 }}
                 className="w-full resize-none bg-transparent px-3 py-2.5 text-sm text-slate-200 placeholder:text-slate-500 focus:outline-none min-h-[44px] max-h-[120px]"

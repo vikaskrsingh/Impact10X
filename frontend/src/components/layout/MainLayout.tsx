@@ -7,7 +7,7 @@ export default function MainLayout() {
   const location = useLocation();
 
   return (
-    <div className="flex min-h-screen text-slate-200 bg-slate-950 relative overflow-hidden">
+    <div className="flex h-screen text-slate-200 bg-slate-950 relative overflow-hidden">
       {/* Background glow effects (matching Login screen) */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-primary/10 via-slate-900 to-slate-950" />
@@ -18,7 +18,7 @@ export default function MainLayout() {
       <Sidebar />
       <div className="flex flex-1 flex-col relative z-10">
         <Header />
-        
+
         <main className="flex-1 overflow-x-hidden p-6 lg:p-8 flex flex-col relative">
           <AnimatePresence mode="wait">
             <motion.div
@@ -27,7 +27,7 @@ export default function MainLayout() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98, y: -10 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
-              className="h-full relative z-10 w-full"
+              className="flex-1 flex flex-col h-full relative z-10 w-full"
             >
               <Outlet />
             </motion.div>

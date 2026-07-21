@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from .core.config import settings  # noqa: F401 — ensures .env is loaded first
 from .utils.db import init_db
 from .api import agents, documents, chat, dashboard
 
