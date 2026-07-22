@@ -22,7 +22,7 @@ def chat_with_expert(payload: ChatRequest):
             )
             
         # 2. Retrieve context chunks via RAG
-        context_chunks = retrieve_context(payload.expertId, payload.question, top_k=3)
+        context_chunks = retrieve_context(payload.expertId, payload.question, top_k=2)
         
         # 3. Get domain-specific system prompt
         system_prompt = get_system_prompt(payload.expertId)
@@ -90,7 +90,7 @@ def chat_stream(payload: ChatRequest):
                 detail=f"Expert Agent with ID '{payload.expertId}' not found."
             )
             
-        context_chunks = retrieve_context(payload.expertId, payload.question, top_k=3)
+        context_chunks = retrieve_context(payload.expertId, payload.question, top_k=2)
         system_prompt = get_system_prompt(payload.expertId)
         
         sources = list(set([chunk["document_id"] for chunk in context_chunks if chunk.get("document_id")]))
@@ -106,7 +106,7 @@ def chat_stream(payload: ChatRequest):
             resolved_sources.append(doc_id_to_name.get(src_id, src_id))
 
         def event_generator():
-            # Send initial metadata
+            # Send initial metadata immediately
             metadata = {
                 "type": "metadata",
                 "sources": resolved_sources,
@@ -114,19 +114,25 @@ def chat_stream(payload: ChatRequest):
                 "expert": agent["name"]
             }
             yield f"data: {json.dumps(metadata)}\n\n"
-            
+
             full_answer = ""
-            for chunk in generate_grounded_answer_stream(system_prompt, payload.question, context_chunks):
-                full_answer += chunk
-                yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
-                
+            for event_type, content in generate_grounded_answer_stream(system_prompt, payload.question, context_chunks):
+                if event_type == "chunk":
+                    full_answer += content
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': content})}\n\n"
+                elif event_type == "image":
+                    # Image generated after text stream — append to end
+                    yield f"data: {json.dumps({'type': 'image', 'markdown': content})}\n\n"
+                elif event_type == "error":
+                    yield f"data: {json.dumps({'type': 'chunk', 'text': content})}\n\n"
+
             # Log interaction after stream finishes
             msg_id = insert_chat_interaction(
                 agent_id=payload.expertId,
                 user_message=payload.question,
                 assistant_message=full_answer
             )
-            
+
             yield f"data: {json.dumps({'type': 'done', 'id': msg_id})}\n\n"
 
         return StreamingResponse(event_generator(), media_type="text/event-stream")

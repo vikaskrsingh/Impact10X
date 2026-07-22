@@ -3,8 +3,7 @@ Centralized application configuration.
 
 All environment-related properties are loaded from a .env file
 (located in the backend root) and exposed via a single `settings` instance.
-To switch databases, LLM providers, or embedding models in production,
-edit the .env file and restart the server — no code changes required.
+To switch models or features, edit the .env file and restart the server — no code changes required.
 """
 
 import os
@@ -23,16 +22,13 @@ class Settings:
     # ── Database ──────────────────────────────────────────────────────
     DATABASE_URL: str = os.environ.get("DATABASE_URL", "omnimind.db")
 
-    # ── LLM engine toggle ─────────────────────────────────────────────
-    USE_OLLAMA: bool = os.environ.get("USE_OLLAMA", "false").lower() == "true"
+    # ── Gemini API ────────────────────────────────────────────────────
     GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 
-    # ── Chat models ───────────────────────────────────────────────────
-    OLLAMA_CHAT_MODEL: str = os.environ.get("OLLAMA_CHAT_MODEL", "llama3")
-    GEMINI_CHAT_MODEL: str = os.environ.get("GEMINI_CHAT_MODEL", "gemini-3.5-flash")
+    # ── Chat model ────────────────────────────────────────────────────
+    GEMINI_CHAT_MODEL: str = os.environ.get("GEMINI_CHAT_MODEL", "gemini-2.0-flash")
 
-    # ── Embedding models ──────────────────────────────────────────────
-    OLLAMA_EMBED_MODEL: str = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
+    # ── Embedding model ───────────────────────────────────────────────
     GEMINI_EMBED_MODEL: str = os.environ.get("GEMINI_EMBED_MODEL", "text-embedding-004")
 
     # ── Vector DB ─────────────────────────────────────────────────────
