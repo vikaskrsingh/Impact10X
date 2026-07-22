@@ -112,7 +112,8 @@ export async function streamExpert(
   question: string,
   onMetadata: (metadata: { sources: string[], confidenceScore: number, expert: string }) => void,
   onChunk: (text: string) => void,
-  onDone: (id: number) => void
+  onDone: (id: number) => void,
+  onImage?: (markdown: string) => void
 ): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/chat/stream`, {
     method: "POST",
@@ -149,6 +150,13 @@ export async function streamExpert(
             onMetadata({ sources: data.sources, confidenceScore: data.confidenceScore, expert: data.expert });
           } else if (data.type === 'chunk') {
             onChunk(data.text);
+          } else if (data.type === 'image') {
+            // Append generated image after streamed text
+            if (onImage) {
+              onImage(data.markdown);
+            } else {
+              onChunk('\n\n' + data.markdown);
+            }
           } else if (data.type === 'done') {
             onDone(data.id);
           }
