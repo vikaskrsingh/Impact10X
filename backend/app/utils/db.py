@@ -6,6 +6,7 @@ from sqlalchemy import (
     func, event
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from pgvector.sqlalchemy import Vector
 
 from ..core.config import settings
 
@@ -65,7 +66,7 @@ class DocumentChunk(Base):
     agent_id = Column(String, ForeignKey('agents.id', ondelete='CASCADE'), nullable=False)
     chunk_index = Column(Integer, nullable=False)
     content = Column(Text, nullable=False)
-    embedding = Column(Text, nullable=True)
+    embedding = Column(Vector(768), nullable=True)
 
     document = relationship("Document", back_populates="chunks")
 

@@ -34,7 +34,7 @@ flowchart TB
 
     subgraph Storage & AI [Data & Intelligence]
         DB[(SQLite Database)]
-        LLM{{Local Ollama / Cloud Gemini}}
+        LLM{{Cloud Gemini}}
     end
 
     ChatLogic <--> DB

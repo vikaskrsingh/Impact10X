@@ -24,15 +24,12 @@ class Settings:
     DATABASE_URL: str = os.environ.get("DATABASE_URL", "omnimind.db")
 
     # ── LLM engine toggle ─────────────────────────────────────────────
-    USE_OLLAMA: bool = os.environ.get("USE_OLLAMA", "false").lower() == "true"
     GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 
     # ── Chat models ───────────────────────────────────────────────────
-    OLLAMA_CHAT_MODEL: str = os.environ.get("OLLAMA_CHAT_MODEL", "llama3")
     GEMINI_CHAT_MODEL: str = os.environ.get("GEMINI_CHAT_MODEL", "gemini-3.5-flash")
 
     # ── Embedding models ──────────────────────────────────────────────
-    OLLAMA_EMBED_MODEL: str = os.environ.get("OLLAMA_EMBED_MODEL", "nomic-embed-text")
     GEMINI_EMBED_MODEL: str = os.environ.get("GEMINI_EMBED_MODEL", "text-embedding-004")
 
     # ── Vector DB ─────────────────────────────────────────────────────

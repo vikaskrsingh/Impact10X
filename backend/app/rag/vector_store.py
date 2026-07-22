@@ -5,9 +5,8 @@ from collections import Counter
 from typing import List, Dict, Any, Optional
 import concurrent.futures
 from google import genai
-import ollama
 from ..core.config import settings
-from ..utils.db import insert_document_chunks, fetch_chunks_by_agent, update_document_status
+from ..utils.db import insert_document_chunks, fetch_chunks_by_agent, update_document_status, SessionLocal, DocumentChunk
 
 def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 200) -> List[str]:
     if not text:
@@ -51,32 +50,22 @@ def get_gemini_client() -> Optional[genai.Client]:
             print(f"Error initializing Gemini client for embeddings: {e}")
     return None
 
-def is_ollama_enabled() -> bool:
-    return settings.USE_OLLAMA
-
-def _embed_chunk(idx: int, chunk: str, use_ollama: bool, client: Optional[genai.Client]) -> Dict[str, Any]:
-    embedding_str = None
-    if use_ollama:
-        try:
-            model_name = settings.OLLAMA_EMBED_MODEL
-            response = ollama.embeddings(model=model_name, prompt=chunk)
-            embedding_str = json.dumps(response["embedding"])
-        except Exception as e:
-            print(f"Failed to generate Ollama embedding for chunk {idx}: {e}")
-    elif client:
+def _embed_chunk(idx: int, chunk: str, client: Optional[genai.Client]) -> Dict[str, Any]:
+    embedding_list = None
+    if client:
         try:
             response = client.models.embed_content(
                 model=settings.GEMINI_EMBED_MODEL,
                 contents=chunk
             )
-            embedding_str = json.dumps(response.embeddings[0].values)
+            embedding_list = response.embeddings[0].values
         except Exception as e:
             print(f"Failed to generate Gemini embedding for chunk {idx}: {e}")
             
     return {
         "chunk_index": idx,
         "content": chunk,
-        "embedding": embedding_str
+        "embedding": embedding_list
     }
 
 def process_document_background(document_id: str, agent_id: str, text: str) -> None:
@@ -86,8 +75,7 @@ def process_document_background(document_id: str, agent_id: str, text: str) -> N
             update_document_status(document_id, "Approved")
             return
             
-        use_ollama = is_ollama_enabled()
-        client = get_gemini_client() if not use_ollama else None
+        client = get_gemini_client()
         
         db_chunks = []
         max_workers = 5
@@ -95,7 +83,7 @@ def process_document_background(document_id: str, agent_id: str, text: str) -> N
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = []
             for idx, chunk in enumerate(chunks):
-                futures.append(executor.submit(_embed_chunk, idx, chunk, use_ollama, client))
+                futures.append(executor.submit(_embed_chunk, idx, chunk, client))
                 
             for future in concurrent.futures.as_completed(futures):
                 res = future.result()
@@ -121,54 +109,38 @@ def index_document(document_id: str, agent_id: str, text: str) -> None:
     process_document_background(document_id, agent_id, text)
 
 def retrieve_context(agent_id: str, query: str, top_k: int = 3) -> List[Dict[str, Any]]:
+    client = get_gemini_client()
+    
+    # 1. Try Native GCP Vector Search (pgvector)
+    if client:
+        try:
+            response = client.models.embed_content(
+                model=settings.GEMINI_EMBED_MODEL,
+                contents=query
+            )
+            query_embedding = response.embeddings[0].values
+            
+            with SessionLocal() as session:
+                chunks = session.query(DocumentChunk).filter(DocumentChunk.agent_id == agent_id).order_by(
+                    DocumentChunk.embedding.cosine_distance(query_embedding)
+                ).limit(top_k).all()
+                
+                if chunks:
+                    return [{"content": c.content, "document_id": c.document_id} for c in chunks]
+        except Exception as e:
+            print(f"Native vector search failed, falling back to local keyword matching: {e}")
+            
+    # 2. Fallback to local keyword search
     chunks = fetch_chunks_by_agent(agent_id)
     if not chunks:
         return []
         
-    use_ollama = is_ollama_enabled()
-    client = get_gemini_client() if not use_ollama else None
+    query_tokens = get_tokens(query)
     scored_chunks = []
     
-    # Attempt embedding similarity if engine is active and embeddings exist in db
-    can_use_embeddings = (use_ollama or client) and all(c.get("embedding") for c in chunks)
-    
-    if can_use_embeddings:
-        try:
-            query_embedding = None
-            if use_ollama:
-                model_name = settings.OLLAMA_EMBED_MODEL
-                response = ollama.embeddings(model=model_name, prompt=query)
-                query_embedding = response["embedding"]
-            else:
-                response = client.models.embed_content(
-                    model=settings.GEMINI_EMBED_MODEL,
-                    contents=query
-                )
-                query_embedding = response.embeddings[0].values
-            
-            for chunk in chunks:
-                chunk_emb = json.loads(chunk["embedding"])
-                
-                # Compute cosine similarity
-                dot_product = sum(a * b for a, b in zip(query_embedding, chunk_emb))
-                norm_a = math.sqrt(sum(a * a for a in query_embedding))
-                norm_b = math.sqrt(sum(b * b for b in chunk_emb))
-                similarity = dot_product / (norm_a * norm_b) if norm_a and norm_b else 0.0
-                
-                scored_chunks.append((chunk, similarity))
-        except Exception as e:
-            print(f"Embedding search failed (Ollama={use_ollama}), falling back to local keyword matching: {e}")
-            can_use_embeddings = False # Force fallback
-            
-    # Fallback to local keyword search
-    if not can_use_embeddings or not scored_chunks:
-        query_tokens = get_tokens(query)
-        for chunk in chunks:
-            similarity = compute_local_similarity(query_tokens, chunk["content"])
-            scored_chunks.append((chunk, similarity))
-            
-    # Sort by similarity descending
+    for chunk in chunks:
+        similarity = compute_local_similarity(query_tokens, chunk["content"])
+        scored_chunks.append((chunk, similarity))
+        
     scored_chunks.sort(key=lambda x: x[1], reverse=True)
-    
-    # Return top K chunks as a list of dicts
     return [item[0] for item in scored_chunks[:top_k]]

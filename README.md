@@ -11,8 +11,28 @@ OmniMind is a knowledge AI platform designed for European banking workflows. It 
 - **Asynchronous Document Processing**: Built with FastAPI BackgroundTasks and multithreading, OmniMind seamlessly handles massive document uploads and vector embeddings without blocking or timing out the user interface.
 - **Document Management**: Admins have full control over the knowledge base, complete with dynamic visual processing states (Processing, Approved, Failed) and document deletion capabilities.
 - **Role-Based Access Control & Routing**: Secure protected routes that seamlessly redirect unauthenticated users to the Login screen, and route authenticated users to their appropriate Workspace or Admin Dashboard.
-- **Local AI Inference (Ollama)**: Full support for 100% free, private, offline AI inference using local models like `llama3` for chat and `nomic-embed-text` for RAG document embeddings.
 - **Premium Aesthetics**: Built with Framer Motion and TailwindCSS featuring glassmorphism, dynamic animations, deep slate backgrounds, and neon accents.
+
+## Application Overview and Architecture
+
+OmniMind (AURA) follows a decoupled, modular client-server architecture designed for high scalability, real-time AI interactivity, and absolute data privacy. It is composed of three main layers:
+
+### 1. Presentation Layer (Frontend)
+- **Framework:** React + TypeScript + Vite for ultra-fast builds and type-safe development.
+- **Styling & UI:** TailwindCSS combined with Framer Motion for a premium, glassmorphism-inspired aesthetic with dynamic micro-animations.
+- **Routing:** React Router drives the single-page application (SPA), featuring route guards that separate the user-facing **AI Workspace** from the governance-focused **Admin Dashboard**.
+- **Real-Time UX:** Uses Server-Sent Events (SSE) to consume streaming tokens from the backend, providing a smooth, ChatGPT-like typing experience.
+
+### 2. Application & API Layer (Backend)
+- **Framework:** FastAPI (Python) provides a lightning-fast, highly concurrent ASGI web server.
+- **Asynchronous Processing:** Heavy operations like document parsing, chunking, and vector embedding are offloaded to FastAPI BackgroundTasks to ensure the UI remains instantly responsive.
+- **Document Ingestion Pipeline:** Natively supports PDF, DOCX, and URL web-scraping using `pypdf`, `python-docx`, and `BeautifulSoup`.
+
+### 3. Data & Intelligence Layer
+- **Relational Database:** Managed via SQLAlchemy. Defaults to SQLite for immediate local setup, with native support for PostgreSQL (via `psycopg2`) for enterprise deployments.
+- **Vector Database:** Local vector storage for Retrieval-Augmented Generation (RAG) embeddings.
+- **LLM Engine Options:**
+  - **Cloud AI (Gemini):** Integration with Google's Gemini API (`gemini-3.5-flash`, `text-embedding-004`) for cloud-based scaling.
 
 ## Project Structure
 
@@ -177,38 +197,4 @@ This generates a `dist/` folder containing your static production website.
    ```
 
 When complete, Firebase will provide you with a live Hosting URL (e.g., `https://your-project.web.app`). OmniMind is now live on the internet!
-
----
-
-## Local AI Inference (Ollama Support)
-
-By default, OmniMind uses a mock simulated response when running locally without API keys. You can configure OmniMind to use **Google Gemini** for cloud deployments, or **Ollama** for completely free, local, open-source AI inference.
-
-### Setting up Ollama
-1. Download and install [Ollama](https://ollama.com/).
-2. Pull the required models in your terminal:
-   ```bash
-   ollama pull llama3             # For chat generation
-   ollama pull nomic-embed-text   # For document embeddings (RAG)
-   ```
-
-### Running OmniMind with Ollama
-Before starting the backend server, set the `USE_OLLAMA` environment variable.
-
-**On Windows (PowerShell):**
-```powershell
-$env:USE_OLLAMA="true"
-$env:OLLAMA_CHAT_MODEL="llama3"
-$env:OLLAMA_EMBED_MODEL="nomic-embed-text"
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-**On Mac/Linux:**
-```bash
-export USE_OLLAMA="true"
-export OLLAMA_CHAT_MODEL="llama3"
-export OLLAMA_EMBED_MODEL="nomic-embed-text"
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
-```
-
-*Warning: If you switch from Gemini to Ollama (or vice versa), the vector dimensions of the embeddings will change. You must delete the local `omnimind.db` file and restart the server to regenerate the document chunks using the new model!*
+

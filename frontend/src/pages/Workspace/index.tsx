@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from "framer-motion";
-import { SendHorizonal, Loader2, User, FileJson, ThumbsUp, ThumbsDown, Trash2, ChevronDown } from "lucide-react";
+import { SendHorizonal, Loader2, User, FileJson, FileText, ThumbsUp, ThumbsDown, Trash2, ChevronDown } from "lucide-react";
+import { MarkdownRenderer } from '../../components/common/MarkdownRenderer';
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
-import { askExpert, streamExpert, getAgents, getDocuments, submitChatFeedback } from "../../services/omnimindApi";
+import { askExpert, streamExpert, getAgents, getDocuments, submitChatFeedback, askMultipleExperts, streamMultipleExperts } from "../../services/omnimindApi";
 
 type Message = {
   role: "assistant" | "user";
@@ -109,8 +110,8 @@ export default function Workspace() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const expertParam = searchParams.get("expert") ?? "kyc";
-  const selectedExpertId = experts.some((e) => e.id === expertParam) ? expertParam : "kyc";
-  const selectedExpert = experts.find((e) => e.id === selectedExpertId) ?? experts[0];
+  const selectedExpertId = experts.some((e) => e.id === expertParam) ? expertParam : (experts.length > 0 ? experts[0].id : "kyc");
+  const selectedExpert = experts.find((e) => e.id === selectedExpertId) ?? (experts.length > 0 ? experts[0] : expertsSeed[0]);
   const activeMessages = multiAgentMode ? (threads["multi"] ?? []) : (threads[selectedExpertId] ?? defaultThreads[selectedExpertId] ?? []);
 
   useEffect(() => {
@@ -161,15 +162,7 @@ export default function Workspace() {
           description: `${agent.name} knowledge workspace`,
           stats: { docs: 10, questions: "1.2k", accuracy: "95%", updated: "Just now" }
         }));
-        setExperts((prev) => {
-          const merged = prev.map(p => {
-            const found = mappedExperts.find(m => m.id === p.id);
-            return found ? { ...p, owner: found.owner, name: found.name } : p;
-          });
-
-          const newAgents = mappedExperts.filter(m => !prev.some(p => p.id === m.id));
-          return [...merged, ...newAgents];
-        });
+        setExperts(mappedExperts.length > 0 ? mappedExperts : expertsSeed);
       }
     } catch (error) {
       console.error("Unable to load expert workspace", error);
@@ -231,34 +224,92 @@ export default function Workspace() {
         return;
       }
 
-      // Query multiple agents concurrently
-      const promises = selectedMultiAgents.map(async (agentId) => {
-        const agent = experts.find(e => e.id === agentId);
-        try {
-          const response = await askExpert(agentId, trimmed);
-          return {
-            role: "assistant" as const,
-            text: `[${agent?.name}]: ${response.answer}`,
-            sources: response.sources,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            id: response.id,
-            confidenceScore: response.confidenceScore,
-            feedbackStatus: null
-          };
-        } catch (_error) {
-          return {
-            role: "assistant" as const,
-            text: `[${agent?.name}]: The expert service is temporarily unavailable.`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          };
-        }
-      });
+      // Query multiple agents using the synthesized endpoint
+      try {
+        const resTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        // Add placeholder message for assistant
+        setThreads((current) => ({
+          ...current,
+          multi: [
+            ...(current.multi ?? []),
+            {
+              role: "assistant",
+              text: "",
+              timestamp: resTimestamp
+            },
+          ],
+        }));
 
-      const results = await Promise.all(promises);
-      setThreads((current) => ({
-        ...current,
-        multi: [...(current.multi ?? []), ...results],
-      }));
+        await streamMultipleExperts(
+          selectedMultiAgents,
+          trimmed,
+          (metadata) => {
+            setThreads((current) => {
+              const threads = [...(current.multi ?? [])];
+              const lastIndex = threads.length - 1;
+              if (lastIndex >= 0) {
+                threads[lastIndex] = {
+                  ...threads[lastIndex],
+                  sources: metadata.sources,
+                  confidenceScore: metadata.confidenceScore,
+                };
+              }
+              return { ...current, multi: threads };
+            });
+          },
+          (textChunk) => {
+            setThreads((current) => {
+              const threads = [...(current.multi ?? [])];
+              const lastIndex = threads.length - 1;
+              if (lastIndex >= 0) {
+                // Prepend the Synthesizer tag if this is the first chunk and it hasn't been added yet
+                let newText = threads[lastIndex].text + textChunk;
+                if (!threads[lastIndex].text && !newText.startsWith("[OmniMind Synthesizer]:")) {
+                  newText = `[OmniMind Synthesizer]: ${newText}`;
+                }
+                threads[lastIndex] = {
+                  ...threads[lastIndex],
+                  text: newText
+                };
+              }
+              return { ...current, multi: threads };
+            });
+          },
+          (msgId) => {
+            setThreads((current) => {
+              const threads = [...(current.multi ?? [])];
+              const lastIndex = threads.length - 1;
+              if (lastIndex >= 0) {
+                threads[lastIndex] = {
+                  ...threads[lastIndex],
+                  id: msgId,
+                  feedbackStatus: null
+                };
+              }
+              return { ...current, multi: threads };
+            });
+          }
+        );
+      } catch (_error) {
+        const resTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setThreads((current) => {
+          const threads = [...(current.multi ?? [])];
+          const lastIndex = threads.length - 1;
+          if (lastIndex >= 0 && threads[lastIndex].text === "") {
+            threads[lastIndex] = {
+              ...threads[lastIndex],
+              text: "[OmniMind Synthesizer]: The multi-expert service is temporarily unavailable. Please retry in a moment."
+            };
+          } else {
+            threads.push({
+              role: "assistant",
+              text: "[OmniMind Synthesizer]: The multi-expert service is temporarily unavailable. Please retry in a moment.",
+              timestamp: resTimestamp
+            });
+          }
+          return { ...current, multi: threads };
+        });
+      }
       setIsTyping(false);
     } else {
       try {
@@ -447,20 +498,28 @@ export default function Workspace() {
                 >
                   <div className="flex items-center gap-2 text-xs font-semibold">
                     <span className={message.role === "user" ? "text-white" : "text-purple-400"}>
-                      {message.role === "user" ? "You" : (multiAgentMode && message.text.startsWith("[") ? message.text.substring(1, message.text.indexOf("]")) : selectedExpert.name)}
+                      {message.role === "user" 
+                        ? "You" 
+                        : (message.text.startsWith("[") && message.text.includes("]: ") 
+                            ? message.text.substring(1, message.text.indexOf("]: ")) 
+                            : selectedExpert.name)}
                     </span>
                     <span className="text-[10px] text-slate-600 font-medium">{message.timestamp || "10:32 AM"}</span>
                   </div>
 
-                  <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap pl-[1px]">
-                    {multiAgentMode && message.role === "assistant" && message.text.startsWith("[") ? message.text.substring(message.text.indexOf("]") + 2) : message.text}
+                  <div className="w-full">
+                    <MarkdownRenderer 
+                      content={message.role === "assistant" && message.text.startsWith("[") && message.text.includes("]: ") 
+                        ? message.text.substring(message.text.indexOf("]: ") + 3) 
+                        : message.text} 
+                    />
                   </div>
 
                   {showSources && message.sources && message.sources.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-1 pl-[1px]">
                       {message.sources.map((source, idx) => (
                         <span key={idx} className="inline-flex items-center gap-1 rounded bg-[#131825] border border-white/10 px-2 py-1 text-[10px] font-medium text-slate-400">
-                          <FileJson size={10} className="text-purple-400" /> {source}
+                          <FileText size={10} className="text-blue-400" /> {source}
                         </span>
                       ))}
                     </div>
@@ -543,12 +602,6 @@ export default function Workspace() {
               <span className="text-xs text-slate-500 font-medium">
                 {multiAgentMode ? "Broadcast your query to multiple experts at once." : `${selectedExpert.name} responds only based on uploaded documents.`}
               </span>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <span className="text-xs text-slate-400 font-medium">Show Sources</span>
-                <div className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${showSources ? 'bg-purple-500' : 'bg-slate-700'}`} onClick={() => setShowSources(!showSources)}>
-                  <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${showSources ? 'translate-x-3.5' : 'translate-x-0.5'}`} />
-                </div>
-              </label>
             </div>
 
             <div className="relative flex items-end gap-2 rounded-xl border border-white/10 bg-[#131825] p-2 focus-within:border-purple-500/50 focus-within:ring-1 focus-within:ring-purple-500/50 transition-all">

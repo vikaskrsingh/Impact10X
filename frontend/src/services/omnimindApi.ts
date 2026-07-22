@@ -107,6 +107,13 @@ export async function askExpert(expertId: string, question: string): Promise<Cha
   });
 }
 
+export async function askMultipleExperts(expertIds: string[], question: string): Promise<ChatResponse> {
+  return api<ChatResponse>("/chat/multi", {
+    method: "POST",
+    body: JSON.stringify({ expertIds, question }),
+  });
+}
+
 export async function streamExpert(
   expertId: string, 
   question: string,
@@ -118,6 +125,59 @@ export async function streamExpert(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ expertId, question }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || "Request failed");
+  }
+
+  if (!response.body) throw new Error("ReadableStream not supported");
+  
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    
+    let boundary = buffer.indexOf('\n\n');
+    while (boundary !== -1) {
+      const chunk = buffer.slice(0, boundary).trim();
+      buffer = buffer.slice(boundary + 2);
+      boundary = buffer.indexOf('\n\n');
+      
+      if (chunk.startsWith('data: ')) {
+        try {
+          const data = JSON.parse(chunk.slice(6));
+          if (data.type === 'metadata') {
+            onMetadata({ sources: data.sources, confidenceScore: data.confidenceScore, expert: data.expert });
+          } else if (data.type === 'chunk') {
+            onChunk(data.text);
+          } else if (data.type === 'done') {
+            onDone(data.id);
+          }
+        } catch (e) {
+          console.error("Error parsing SSE chunk", e);
+        }
+      }
+    }
+  }
+}
+
+export async function streamMultipleExperts(
+  expertIds: string[], 
+  question: string,
+  onMetadata: (metadata: { sources: string[], confidenceScore: number, expert: string }) => void,
+  onChunk: (text: string) => void,
+  onDone: (id: number) => void
+): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/chat/multi/stream`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ expertIds, question }),
   });
 
   if (!response.ok) {

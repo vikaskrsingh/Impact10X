@@ -1,7 +1,6 @@
 from typing import List
 from google import genai
 from google.genai import types
-import ollama
 import re
 import os
 import uuid
@@ -16,9 +15,6 @@ def get_gemini_client():
         except Exception as e:
             print(f"Error initializing Gemini client: {e}")
     return None
-
-def is_ollama_enabled() -> bool:
-    return settings.USE_OLLAMA
 
 def process_image_prompts(response_text: str, client) -> str:
     if not settings.ENABLE_IMAGE_GENERATION or not client:
@@ -59,8 +55,7 @@ def generate_grounded_answer(
     user_question: str,
     context_chunks: List[dict]
 ) -> str:
-    use_ollama = is_ollama_enabled()
-    client = get_gemini_client() if not use_ollama else None
+    client = get_gemini_client()
     
     # Build context formatting
     formatted_context = ""
@@ -89,21 +84,7 @@ def generate_grounded_answer(
         f"Question: {user_question}"
     )
 
-    if use_ollama:
-        try:
-            model_name = settings.OLLAMA_CHAT_MODEL
-            response = ollama.chat(
-                model=model_name,
-                messages=[
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': prompt}
-                ]
-            )
-            return process_image_prompts(response['message']['content'], client)
-        except Exception as e:
-            print(f"Error during Ollama generation: {e}. Falling back to simulated generation.")
-            
-    elif client:
+    if client:
         try:
             response = client.models.generate_content(
                 model=settings.GEMINI_CHAT_MODEL,
@@ -154,10 +135,10 @@ def generate_grounded_answer(
         joined_sentences += "."
         
     answer = (
-        f"[DEMO MODE - No GEMINI_API_KEY or USE_OLLAMA detected]\n\n"
+        f"[SIMULATED RESPONSE - API Unavailable/Unconfigured]\n\n"
         f"Grounded response based on approved knowledge assets ({sources_str}):\n\n"
         f"{joined_sentences}\n\n"
-        f"For real LLM reasoning, please set USE_OLLAMA=true or the GEMINI_API_KEY environment variable."
+        f"For real LLM reasoning, please ensure your GEMINI_API_KEY is valid and the API is reachable."
     )
     return process_image_prompts(answer, client)
 
@@ -166,8 +147,7 @@ def generate_grounded_answer_stream(
     user_question: str,
     context_chunks: List[dict]
 ):
-    use_ollama = is_ollama_enabled()
-    client = get_gemini_client() if not use_ollama else None
+    client = get_gemini_client()
     
     # Build context formatting
     formatted_context = ""
@@ -182,25 +162,7 @@ def generate_grounded_answer_stream(
         f"Question: {user_question}"
     )
 
-    if use_ollama:
-        try:
-            model_name = settings.OLLAMA_CHAT_MODEL
-            response = ollama.chat(
-                model=model_name,
-                messages=[
-                    {'role': 'system', 'content': system_prompt},
-                    {'role': 'user', 'content': prompt}
-                ],
-                stream=True
-            )
-            for chunk in response:
-                if 'message' in chunk and 'content' in chunk['message']:
-                    yield chunk['message']['content']
-            return
-        except Exception as e:
-            print(f"Error during Ollama generation: {e}. Falling back to simulated generation.")
-            
-    elif client:
+    if client:
         try:
             response_stream = client.models.generate_content_stream(
                 model=settings.GEMINI_CHAT_MODEL,
@@ -248,15 +210,14 @@ def generate_grounded_answer_stream(
         joined_sentences += "."
         
     answer = (
-        f"[DEMO MODE - No GEMINI_API_KEY or USE_OLLAMA detected]\n\n"
+        f"[SIMULATED RESPONSE - API Unavailable/Unconfigured]\n\n"
         f"Grounded response based on approved knowledge assets ({sources_str}):\n\n"
         f"{joined_sentences}\n\n"
-        f"For real LLM reasoning, please set USE_OLLAMA=true or the GEMINI_API_KEY environment variable."
+        f"For real LLM reasoning, please ensure your GEMINI_API_KEY is valid and the API is reachable."
     )
-    
     import time
     words = answer.split(' ')
     for word in words:
         yield word + ' '
-        time.sleep(0.05)
+        time.sleep(0.01)
 

@@ -18,8 +18,8 @@ import { Button } from "@/components/ui/button";
 import { MetricCard, PanelCard } from "../components/common/PanelCard";
 import { getStoredRole, isAdminRole, getStoredUsername } from "@/utils/auth";
 import { useEffect, useState } from "react";
-import { getDashboardStats, getRecentActivity, getRecentUploads } from "../services/omnimindApi";
-import type { DashboardStats, DashboardActivity, DashboardUpload } from "../services/omnimindApi";
+import { getDashboardStats, getRecentActivity, getRecentUploads, getAgents } from "../services/omnimindApi";
+import type { DashboardStats, DashboardActivity, DashboardUpload, AgentRecord } from "../services/omnimindApi";
 
 export default function Dashboard() {
   const role = getStoredRole();
@@ -34,19 +34,22 @@ export default function Dashboard() {
   });
   const [activity, setActivity] = useState<DashboardActivity[]>([]);
   const [uploads, setUploads] = useState<DashboardUpload[]>([]);
+  const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [statsData, activityData, uploadsData] = await Promise.all([
+        const [statsData, activityData, uploadsData, agentsData] = await Promise.all([
           getDashboardStats(),
           getRecentActivity(),
-          getRecentUploads()
+          getRecentUploads(),
+          getAgents()
         ]);
         setStats(statsData);
         setActivity(activityData);
         setUploads(uploadsData);
+        setAgents(agentsData);
       } catch (error) {
         console.error("Failed to load dashboard data", error);
       } finally {
@@ -102,12 +105,13 @@ export default function Dashboard() {
         {/* Knowledge Coverage -> Average Confidence Score */}
         <PanelCard title="Average Confidence Score" subtitle="AI retrieval confidence by banking domain">
           <div className="space-y-6 pt-2">
-            {[
-              { label: "Retail Banking", percent: 96, color: "bg-purple-500" },
-              { label: "Corporate Finance", percent: 94, color: "bg-emerald-400" },
-              { label: "Wealth Management", percent: 92, color: "bg-amber-400" },
-              { label: "Risk & Compliance", percent: 89, color: "bg-blue-400" },
-            ].map((item) => (
+            {(agents.length > 0 ? agents.map((agent, i) => ({
+              label: agent.name,
+              percent: agent.health,
+              color: ["bg-purple-500", "bg-emerald-400", "bg-amber-400", "bg-blue-400"][i % 4]
+            })) : [
+              { label: "Retail Banking", percent: 0, color: "bg-purple-500" },
+            ]).map((item) => (
               <div key={item.label} className="group">
                 <div className="mb-2.5 flex items-center justify-between text-xs font-semibold">
                   <span className="text-slate-300 group-hover:text-white transition">{item.label}</span>

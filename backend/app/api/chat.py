@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status, Path
-from ..schemas.chat import ChatRequest, ChatResponse, ChatFeedbackRequest
+from ..schemas.chat import ChatRequest, ChatResponse, ChatFeedbackRequest, MultiChatRequest
 from ..utils.db import fetch_agents, insert_chat_interaction, update_chat_feedback
 from ..rag.vector_store import retrieve_context
 from ..agents.prompts import get_system_prompt
@@ -79,6 +79,85 @@ def chat_with_expert(payload: ChatRequest):
             detail=f"Failed to generate answer: {e}"
         )
 
+@router.post("/multi", response_model=ChatResponse)
+def chat_with_multiple_experts(payload: MultiChatRequest):
+    try:
+        agents = fetch_agents()
+        selected_agents = [a for a in agents if a["id"] in payload.expertIds]
+        
+        if not selected_agents:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="None of the selected experts were found."
+            )
+
+        all_context_chunks = []
+        for agent_id in payload.expertIds:
+            chunks = retrieve_context(agent_id, payload.question, top_k=2)
+            all_context_chunks.extend(chunks)
+
+        # Synthesize a general system prompt indicating multi-expert mode
+        expert_names = ", ".join([a["name"] for a in selected_agents])
+        system_prompt = (
+            f"You are the OmniMind Multi-Expert Synthesizer. You are answering on behalf of the following experts: {expert_names}. "
+            "Your objective is to provide a comprehensive, combined answer drawing upon the diverse context provided from these multiple domains. "
+            "Synthesize the information seamlessly, but cite the source documents clearly. "
+            "If the answer cannot be found in the retrieved context, state clearly that the approved policy documents do not contain the answer."
+        )
+        # Append formatting instructions
+        from ..agents.prompts import FORMAT_INSTRUCTIONS
+        system_prompt += FORMAT_INSTRUCTIONS
+
+        answer = generate_grounded_answer(
+            system_prompt=system_prompt,
+            user_question=payload.question,
+            context_chunks=all_context_chunks
+        )
+
+        # For logging, use the first selected agent's ID to satisfy the foreign key constraint
+        msg_id = insert_chat_interaction(
+            agent_id=payload.expertIds[0],
+            user_message=payload.question,
+            assistant_message=answer
+        )
+
+        sources = list(set([chunk["document_id"] for chunk in all_context_chunks if chunk.get("document_id")]))
+        if not sources:
+            sources = ["System Knowledge Base"]
+            
+        from ..utils.db import fetch_documents
+        resolved_sources = []
+        for agent_id in payload.expertIds:
+            doc_records = fetch_documents(agent_id)
+            doc_id_to_name = {d["id"]: d["name"] for d in doc_records}
+            for src_id in sources:
+                if src_id in doc_id_to_name and doc_id_to_name[src_id] not in resolved_sources:
+                    resolved_sources.append(doc_id_to_name[src_id])
+                    
+        # Filter out unresolved source IDs (if they were resolved by another agent)
+        final_sources = [s for s in resolved_sources]
+        if not final_sources and sources != ["System Knowledge Base"]:
+            final_sources = sources
+        elif not final_sources:
+             final_sources = ["System Knowledge Base"]
+
+        avg_health = sum([a["health"] for a in selected_agents]) // len(selected_agents)
+
+        return ChatResponse(
+            id=msg_id,
+            answer=answer,
+            sources=final_sources,
+            expert="OmniMind Synthesizer",
+            confidenceScore=avg_health
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate multi-expert answer: {e}"
+        )
+
 @router.post("/stream")
 def chat_stream(payload: ChatRequest):
     try:
@@ -137,6 +216,86 @@ def chat_stream(payload: ChatRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to generate answer stream: {e}"
+        )
+
+@router.post("/multi/stream")
+def chat_with_multiple_experts_stream(payload: MultiChatRequest):
+    try:
+        agents = fetch_agents()
+        selected_agents = [a for a in agents if a["id"] in payload.expertIds]
+        
+        if not selected_agents:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="None of the selected experts were found."
+            )
+
+        all_context_chunks = []
+        for agent_id in payload.expertIds:
+            chunks = retrieve_context(agent_id, payload.question, top_k=2)
+            all_context_chunks.extend(chunks)
+
+        expert_names = ", ".join([a["name"] for a in selected_agents])
+        system_prompt = (
+            f"You are the OmniMind Multi-Expert Synthesizer. You are answering on behalf of the following experts: {expert_names}. "
+            "Your objective is to provide a comprehensive, combined answer drawing upon the diverse context provided from these multiple domains. "
+            "Synthesize the information seamlessly, but cite the source documents clearly. "
+            "If the answer cannot be found in the retrieved context, state clearly that the approved policy documents do not contain the answer."
+        )
+        from ..agents.prompts import FORMAT_INSTRUCTIONS
+        system_prompt += FORMAT_INSTRUCTIONS
+
+        sources = list(set([chunk["document_id"] for chunk in all_context_chunks if chunk.get("document_id")]))
+        if not sources:
+            sources = ["System Knowledge Base"]
+            
+        from ..utils.db import fetch_documents
+        resolved_sources = []
+        for agent_id in payload.expertIds:
+            doc_records = fetch_documents(agent_id)
+            doc_id_to_name = {d["id"]: d["name"] for d in doc_records}
+            for src_id in sources:
+                if src_id in doc_id_to_name and doc_id_to_name[src_id] not in resolved_sources:
+                    resolved_sources.append(doc_id_to_name[src_id])
+                    
+        final_sources = [s for s in resolved_sources]
+        if not final_sources and sources != ["System Knowledge Base"]:
+            final_sources = sources
+        elif not final_sources:
+             final_sources = ["System Knowledge Base"]
+
+        avg_health = sum([a["health"] for a in selected_agents]) // len(selected_agents)
+
+        def event_generator():
+            yield f"data: {json.dumps({'type': 'metadata', 'sources': final_sources, 'confidenceScore': avg_health, 'expert': 'OmniMind Synthesizer'})}\n\n"
+            
+            answer_generator = generate_grounded_answer_stream(
+                system_prompt=system_prompt,
+                user_question=payload.question,
+                context_chunks=all_context_chunks
+            )
+            
+            full_answer = ""
+            for text_chunk in answer_generator:
+                full_answer += text_chunk
+                yield f"data: {json.dumps({'type': 'chunk', 'text': text_chunk})}\n\n"
+                
+            msg_id = insert_chat_interaction(
+                agent_id=payload.expertIds[0],
+                user_message=payload.question,
+                assistant_message=full_answer
+            )
+            
+            yield f"data: {json.dumps({'type': 'done', 'id': msg_id})}\n\n"
+
+        return StreamingResponse(event_generator(), media_type="text/event-stream")
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to generate multi-expert answer stream: {e}"
         )
 
 @router.post("/{message_id}/feedback", status_code=status.HTTP_200_OK)

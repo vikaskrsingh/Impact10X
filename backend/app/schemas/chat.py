@@ -5,6 +5,10 @@ class ChatRequest(BaseModel):
     expertId: str = Field(..., min_length=1)
     question: str = Field(..., min_length=1)
 
+class MultiChatRequest(BaseModel):
+    expertIds: List[str] = Field(..., min_items=1)
+    question: str = Field(..., min_length=1)
+
 class ChatResponse(BaseModel):
     id: int
     answer: str
