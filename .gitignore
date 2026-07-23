@@ -71,3 +71,4 @@ backend/*.db
 backend/*.sqlite
 backend/*.sqlite3
 backend/omnimind.db
+package-lock.json
