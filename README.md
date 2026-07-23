@@ -122,6 +122,7 @@ The frontend will be available at `http://localhost:5173`.
 ### Login Instructions
 - **Admin Access**: Use any username that does *not* contain the word "expert" and any password. (e.g., `admin` / `admin123`). This grants access to the Dashboard, Analytics, and Governance views.
 - **Expert Access**: Use a username containing "expert" (e.g., `expertuser` / `password`). This restricts access primarily to the AI Workspace.
+- **Single Sign-On (SSO)**: The application UI provides Single Sign-On options for Microsoft Entra and Google Authentication (currently configured as UI placeholders for the demo environment).
 
 ---
 

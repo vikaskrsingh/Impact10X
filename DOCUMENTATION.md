@@ -77,6 +77,7 @@ The application enforces strict routing boundaries based on user roles:
 - **Administrators**: Have complete access to the system. Upon login, they are directed to the central **Dashboard** where they can monitor analytics, manage system health, configure AI agents, and upload source documents to the Knowledge Center.
 - **Experts**: Restricted access users (e.g., KYC or AML analysts). Upon login, they are routed directly to the **AI Workspace** to perform their operational duties and are locked out of administrative configuration screens.
 - **Protected Routes**: Unauthenticated users are strictly barred from the application and seamlessly redirected to the Login screen.
+- **Single Sign-On (SSO)**: The login interface includes support for Single Sign-On providers, specifically Microsoft Entra and Google Authentication (configured as demo placeholders).
 
 ### Domain-Specific AI Agents
 OmniMind is pre-configured with specialized agents representing different banking domains:

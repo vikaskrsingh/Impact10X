@@ -5,7 +5,7 @@ from sqlalchemy import (
     create_engine, Column, String, Integer, ForeignKey, Text, DateTime,
     func, event
 )
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship, aliased
 from pgvector.sqlalchemy import Vector
 
 from ..core.config import settings
@@ -158,17 +158,27 @@ def init_db():
                 )
                 session.add(chunk)
             session.commit()
+            
+            # Grant default access for expert users to specific agents initially
+            expert_users = session.query(User).filter(User.role == 'expert').all()
+            expert_assignments = {
+                "Chitra": ["kyc", "aml"],
+                "Pranita": ["compliance", "risk"],
+                "expert": ["kyc", "aml", "compliance"]
+            }
+            for expert in expert_users:
+                assigned = expert_assignments.get(expert.username, ["kyc"])
+                for agent_id in assigned:
+                    session.add(UserAgentAccess(user_id=expert.id, agent_id=agent_id))
+            session.commit()
 
-def fetch_agents() -> List[Dict[str, Any]]:
-    with SessionLocal() as session:
-        doc_count_subquery = session.query(func.count(Document.id)).filter(Document.agent_id == Agent.id).scalar_subquery()
-        chat_count_subquery = session.query(func.count(ChatHistory.id)).filter(ChatHistory.agent_id == Agent.id).scalar_subquery()
-        
 def fetch_agents(username: Optional[str] = None, role: Optional[str] = None) -> List[Dict[str, Any]]:
     with SessionLocal() as session:
-        doc_count_subquery = session.query(func.count(Document.id)).filter(Document.agent_id == Agent.id).scalar_subquery()
-        chat_count_subquery = session.query(func.count(ChatHistory.id)).filter(ChatHistory.agent_id == Agent.id).scalar_subquery()
-        user_count_subquery = session.query(func.count(UserAgentAccess.user_id)).filter(UserAgentAccess.agent_id == Agent.id).scalar_subquery()
+        doc_count_subquery = session.query(func.count(Document.id)).filter(Document.agent_id == Agent.id).correlate(Agent).scalar_subquery()
+        chat_count_subquery = session.query(func.count(ChatHistory.id)).filter(ChatHistory.agent_id == Agent.id).correlate(Agent).scalar_subquery()
+        
+        ua_alias = aliased(UserAgentAccess)
+        user_count_subquery = session.query(func.count(ua_alias.user_id)).filter(ua_alias.agent_id == Agent.id).correlate(Agent).scalar_subquery()
         
         admin_count = session.query(func.count(User.id)).filter(User.role == 'admin').scalar()
         
