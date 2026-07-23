@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, status, Path
-from ..schemas.chat import ChatRequest, ChatResponse, ChatFeedbackRequest, MultiChatRequest
-from ..utils.db import fetch_agents, insert_chat_interaction, update_chat_feedback
+from ..schemas.chat import ChatRequest, ChatResponse, ChatFeedbackRequest, MultiChatRequest, MessageResponse
+from ..utils.db import fetch_agents, insert_chat_interaction, update_chat_feedback, fetch_chat_history, clear_chat_history
 from ..rag.vector_store import retrieve_context
 from ..agents.prompts import get_system_prompt
 from ..services.llm import generate_grounded_answer, generate_grounded_answer_stream
@@ -8,6 +8,17 @@ from fastapi.responses import StreamingResponse
 import json
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+@router.get("/history/{agent_id}", response_model=list[MessageResponse])
+def get_chat_history(agent_id: str, session_id: str):
+    return fetch_chat_history(agent_id, session_id)
+
+@router.delete("/history/{agent_id}")
+def clear_history(agent_id: str, session_id: str):
+    success = clear_chat_history(agent_id, session_id)
+    if not success:
+        return {"status": "Not Found or already deleted"}
+    return {"status": "Success"}
 
 @router.post("", response_model=ChatResponse)
 def chat_with_expert(payload: ChatRequest):
@@ -31,14 +42,16 @@ def chat_with_expert(payload: ChatRequest):
         answer = generate_grounded_answer(
             system_prompt=system_prompt,
             user_question=payload.question,
-            context_chunks=context_chunks
+            context_chunks=context_chunks,
+            use_internet_search=payload.useInternetSearch
         )
         
         # 5. Log chat interaction in database
         msg_id = insert_chat_interaction(
             agent_id=payload.expertId,
             user_message=payload.question,
-            assistant_message=answer
+            assistant_message=answer,
+            session_id=payload.sessionId
         )
         
         # 6. Extract source document names
@@ -48,13 +61,6 @@ def chat_with_expert(payload: ChatRequest):
         if not sources:
             sources = ["System Knowledge Base"]
             
-        # Format sources: we want to return document names rather than internal database IDs.
-        # Let's map document_id (which is e.g. 'doc-1') back to document name if possible,
-        # or if it's already a name, use it. Since in db.py we did insert_document_chunks
-        # using the document_id (which is f"{payload.agentId}-{payload.name...}"),
-        # let's look up document names. Wait, let's just fetch the document records for the agent.
-        # Alternatively, we can retrieve chunk["document_id"] and map to the document name.
-        # Let's write a simple helper or lookup to get the actual document names.
         from ..utils.db import fetch_documents
         doc_records = fetch_documents(payload.expertId)
         doc_id_to_name = {d["id"]: d["name"] for d in doc_records}
@@ -111,14 +117,16 @@ def chat_with_multiple_experts(payload: MultiChatRequest):
         answer = generate_grounded_answer(
             system_prompt=system_prompt,
             user_question=payload.question,
-            context_chunks=all_context_chunks
+            context_chunks=all_context_chunks,
+            use_internet_search=payload.useInternetSearch
         )
 
         # For logging, use the first selected agent's ID to satisfy the foreign key constraint
         msg_id = insert_chat_interaction(
             agent_id=payload.expertIds[0],
             user_message=payload.question,
-            assistant_message=answer
+            assistant_message=answer,
+            session_id=payload.sessionId
         )
 
         sources = list(set([chunk["document_id"] for chunk in all_context_chunks if chunk.get("document_id")]))
@@ -195,7 +203,7 @@ def chat_stream(payload: ChatRequest):
             yield f"data: {json.dumps(metadata)}\n\n"
             
             full_answer = ""
-            for chunk in generate_grounded_answer_stream(system_prompt, payload.question, context_chunks):
+            for chunk in generate_grounded_answer_stream(system_prompt, payload.question, context_chunks, payload.useInternetSearch):
                 full_answer += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'text': chunk})}\n\n"
                 
@@ -203,7 +211,8 @@ def chat_stream(payload: ChatRequest):
             msg_id = insert_chat_interaction(
                 agent_id=payload.expertId,
                 user_message=payload.question,
-                assistant_message=full_answer
+                assistant_message=full_answer,
+                session_id=payload.sessionId
             )
             
             yield f"data: {json.dumps({'type': 'done', 'id': msg_id})}\n\n"
@@ -272,7 +281,8 @@ def chat_with_multiple_experts_stream(payload: MultiChatRequest):
             answer_generator = generate_grounded_answer_stream(
                 system_prompt=system_prompt,
                 user_question=payload.question,
-                context_chunks=all_context_chunks
+                context_chunks=all_context_chunks,
+                use_internet_search=payload.useInternetSearch
             )
             
             full_answer = ""
@@ -283,7 +293,8 @@ def chat_with_multiple_experts_stream(payload: MultiChatRequest):
             msg_id = insert_chat_interaction(
                 agent_id=payload.expertIds[0],
                 user_message=payload.question,
-                assistant_message=full_answer
+                assistant_message=full_answer,
+                session_id=payload.sessionId
             )
             
             yield f"data: {json.dumps({'type': 'done', 'id': msg_id})}\n\n"

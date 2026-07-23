@@ -2,22 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings  # noqa: F401 — ensures .env is loaded first
 from .utils.db import init_db
-from .api import agents, documents, chat, dashboard
+from .api import agents, documents, chat, dashboard, auth, users
 
 app = FastAPI(title="OmniMind API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://localhost:5176",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-        "http://127.0.0.1:5176",
-    ],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -33,6 +24,8 @@ app.include_router(agents.router)
 app.include_router(documents.router)
 app.include_router(chat.router)
 app.include_router(dashboard.router)
+app.include_router(auth.router)
+app.include_router(users.router)
 
 @app.get("/")
 def health():

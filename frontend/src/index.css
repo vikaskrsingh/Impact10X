@@ -191,3 +191,14 @@ body {
     @apply font-sans;
   }
 }
+
+.light-theme {
+  filter: invert(1) hue-rotate(180deg);
+  background-color: #f4f5f7;
+}
+
+.light-theme img,
+.light-theme video,
+.light-theme svg {
+  filter: invert(1) hue-rotate(180deg);
+}

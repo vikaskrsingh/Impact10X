@@ -1,9 +1,12 @@
 import { motion } from "framer-motion";
 import { BrainCircuit, Sparkles } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export default function Logo() {
+  const navigate = useNavigate();
+  
   return (
-    <div className="flex items-center gap-4 px-4 py-4 group cursor-pointer">
+    <div onClick={() => navigate('/')} className="flex items-center gap-4 px-4 py-4 group cursor-pointer">
       <div className="relative flex items-center justify-center h-14 w-14 rounded-2xl bg-gradient-to-br from-purple-900/40 to-blue-900/40 border border-purple-500/30 shadow-[0_0_30px_-5px_rgba(168,85,247,0.5)] overflow-hidden">
         
         {/* Animated Background Mesh */}

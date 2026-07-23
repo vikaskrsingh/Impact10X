@@ -19,7 +19,15 @@ const Mermaid = ({ chart }: { chart: string }) => {
         try {
           // Generate a safe unique ID for mermaid to use
           const id = `mermaid-${Math.random().toString(36).substring(2, 9)}`;
-          const { svg } = await mermaid.render(id, chart);
+          
+          // Clean up LLM artifacts
+          const childrenStr = Array.isArray(chart) ? chart.join('') : String(chart);
+          let cleanChart = childrenStr.replace(/```mermaid/g, '').replace(/```/g, '').trim();
+          if (cleanChart.startsWith('mermaid\n')) {
+             cleanChart = cleanChart.substring(8).trim();
+          }
+
+          const { svg } = await mermaid.render(id, cleanChart);
           if (containerRef.current) {
             containerRef.current.innerHTML = svg;
           }

@@ -2,6 +2,7 @@ export type UserRole = "admin" | "expert";
 
 const ROLE_STORAGE_KEY = "omnimind-user-role";
 const USERNAME_STORAGE_KEY = "omnimind-username";
+const TOKEN_STORAGE_KEY = "omnimind-jwt-token";
 
 export function getStoredRole(): UserRole | null {
   if (typeof window === "undefined") {
@@ -45,4 +46,19 @@ export function clearStoredUsername() {
 
 export function isAdminRole(role?: UserRole | null) {
   return role === "admin" || (role === undefined && getStoredRole() === "admin");
+}
+
+export function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(TOKEN_STORAGE_KEY);
+}
+
+export function setStoredToken(token: string) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(TOKEN_STORAGE_KEY, token);
+}
+
+export function clearStoredToken() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
 }

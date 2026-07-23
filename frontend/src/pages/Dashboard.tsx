@@ -136,8 +136,8 @@ export default function Dashboard() {
             {[
               { name: "Manage Agents", icon: Bot, color: "text-purple-400", bg: "bg-purple-500/10", border: "hover:border-purple-500/30", path: "/experts" },
               { name: "Doc Library", icon: UploadCloud, color: "text-blue-400", bg: "bg-blue-500/10", border: "hover:border-blue-500/30", path: "/knowledge" },
-              { name: "Audit Logs", icon: ShieldCheck, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "hover:border-emerald-500/30", path: "/governance" },
-              { name: "Manage Roles", icon: CheckCircle2, color: "text-amber-400", bg: "bg-amber-500/10", border: "hover:border-amber-500/30", path: "/settings" },
+              { name: "Audit Logs", icon: ShieldCheck, color: "text-emerald-400", bg: "bg-emerald-500/10", border: "hover:border-emerald-500/30", path: "/analytics" },
+              { name: "Manage Roles", icon: CheckCircle2, color: "text-amber-400", bg: "bg-amber-500/10", border: "hover:border-amber-500/30", path: "/governance" },
             ].map((item) => (
               <Link key={item.name} to={item.path} className={`flex flex-col items-center justify-center gap-3 rounded-xl border border-white/5 bg-[#131825] p-5 transition-all hover:bg-white/5 ${item.border}`}>
                 <div className={`p-3 rounded-xl ${item.bg} ${item.color}`}>

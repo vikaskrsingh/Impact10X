@@ -1,14 +1,15 @@
 from typing import List
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from ..schemas.agent import AgentCreate, AgentResponse
 from ..utils.db import fetch_agents, insert_agent, delete_agent_by_id
+from .auth import get_current_user
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 @router.get("", response_model=List[AgentResponse])
-def get_agents():
+def get_agents(current_user: dict = Depends(get_current_user)):
     try:
-        return fetch_agents()
+        return fetch_agents(username=current_user["username"], role=current_user["role"])
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

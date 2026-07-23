@@ -53,7 +53,8 @@ def process_image_prompts(response_text: str, client) -> str:
 def generate_grounded_answer(
     system_prompt: str,
     user_question: str,
-    context_chunks: List[dict]
+    context_chunks: List[dict],
+    use_internet_search: bool = False
 ) -> str:
     client = get_gemini_client()
     
@@ -86,13 +87,17 @@ def generate_grounded_answer(
 
     if client:
         try:
+            config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.1
+            )
+            if use_internet_search:
+                config.tools = [{"google_search": {}}]
+
             response = client.models.generate_content(
                 model=settings.GEMINI_CHAT_MODEL,
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    temperature=0.1
-                )
+                config=config
             )
             return process_image_prompts(response.text, client)
         except Exception as e:
@@ -145,7 +150,8 @@ def generate_grounded_answer(
 def generate_grounded_answer_stream(
     system_prompt: str,
     user_question: str,
-    context_chunks: List[dict]
+    context_chunks: List[dict],
+    use_internet_search: bool = False
 ):
     client = get_gemini_client()
     
@@ -164,13 +170,17 @@ def generate_grounded_answer_stream(
 
     if client:
         try:
+            config = types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.1
+            )
+            if use_internet_search:
+                config.tools = [{"google_search": {}}]
+
             response_stream = client.models.generate_content_stream(
                 model=settings.GEMINI_CHAT_MODEL,
                 contents=prompt,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_prompt,
-                    temperature=0.1
-                )
+                config=config
             )
             for chunk in response_stream:
                 if chunk.text:

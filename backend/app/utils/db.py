@@ -35,6 +35,18 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    role = Column(String, nullable=False, default="expert")
+
+class UserAgentAccess(Base):
+    __tablename__ = 'user_agent_access'
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), primary_key=True)
+    agent_id = Column(String, ForeignKey('agents.id', ondelete='CASCADE'), primary_key=True)
+
 class Agent(Base):
     __tablename__ = 'agents'
     id = Column(String, primary_key=True)
@@ -74,6 +86,7 @@ class ChatHistory(Base):
     __tablename__ = 'chat_history'
     id = Column(Integer, primary_key=True, autoincrement=True)
     agent_id = Column(String, ForeignKey('agents.id', ondelete='CASCADE'), nullable=False)
+    session_id = Column(String, index=True, nullable=True)
     user_message = Column(Text, nullable=False)
     assistant_message = Column(Text, nullable=False)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
@@ -85,6 +98,25 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     
     with SessionLocal() as session:
+        # Check if default users exist
+        if session.query(User).count() == 0:
+            import bcrypt
+            # Seed default users with password 'password'
+            # (In a real app, hash should be generated securely beforehand)
+            # For this MVP, we hash on startup if no users exist.
+            pwd_hash = bcrypt.hashpw(b"password", bcrypt.gensalt()).decode("utf-8")
+            users = [
+                User(username="admin", password_hash=pwd_hash, role="admin"),
+                User(username="Vikas", password_hash=pwd_hash, role="admin"),
+                User(username="Nehal", password_hash=pwd_hash, role="admin"),
+                User(username="Rajdeep", password_hash=pwd_hash, role="admin"),
+                User(username="Chitra", password_hash=pwd_hash, role="expert"),
+                User(username="Pranita", password_hash=pwd_hash, role="expert"),
+                User(username="expert", password_hash=pwd_hash, role="expert")
+            ]
+            session.add_all(users)
+            session.commit()
+
         # Check if default agents exist
         if session.query(Agent).count() == 0:
             agents = [
@@ -132,6 +164,14 @@ def fetch_agents() -> List[Dict[str, Any]]:
         doc_count_subquery = session.query(func.count(Document.id)).filter(Document.agent_id == Agent.id).scalar_subquery()
         chat_count_subquery = session.query(func.count(ChatHistory.id)).filter(ChatHistory.agent_id == Agent.id).scalar_subquery()
         
+def fetch_agents(username: Optional[str] = None, role: Optional[str] = None) -> List[Dict[str, Any]]:
+    with SessionLocal() as session:
+        doc_count_subquery = session.query(func.count(Document.id)).filter(Document.agent_id == Agent.id).scalar_subquery()
+        chat_count_subquery = session.query(func.count(ChatHistory.id)).filter(ChatHistory.agent_id == Agent.id).scalar_subquery()
+        user_count_subquery = session.query(func.count(UserAgentAccess.user_id)).filter(UserAgentAccess.agent_id == Agent.id).scalar_subquery()
+        
+        admin_count = session.query(func.count(User.id)).filter(User.role == 'admin').scalar()
+        
         query = session.query(
             Agent.id,
             Agent.name,
@@ -139,9 +179,18 @@ def fetch_agents() -> List[Dict[str, Any]]:
             Agent.health,
             Agent.status,
             doc_count_subquery.label("documents"),
-            chat_count_subquery.label("questions")
-        )
+            chat_count_subquery.label("questions"),
+            user_count_subquery.label("user_accesses")
+        ).order_by(Agent.name)
         
+        # If the user is an expert, filter by assigned agents
+        if role == "expert" and username:
+            user = session.query(User).filter(User.username == username).first()
+            if user:
+                query = query.join(UserAgentAccess, UserAgentAccess.agent_id == Agent.id).filter(UserAgentAccess.user_id == user.id)
+            else:
+                return [] # User not found, no access
+
         results = []
         for row in query.all():
             results.append({
@@ -151,20 +200,54 @@ def fetch_agents() -> List[Dict[str, Any]]:
                 "health": row.health,
                 "status": row.status,
                 "documents": row.documents,
-                "questions": row.questions
+                "questions": row.questions,
+                "users": row.user_accesses + admin_count
             })
         return results
 
+def fetch_users_with_access() -> List[Dict[str, Any]]:
+    with SessionLocal() as session:
+        users = session.query(User).all()
+        result = []
+        for user in users:
+            accesses = session.query(UserAgentAccess).filter(UserAgentAccess.user_id == user.id).all()
+            agent_ids = [a.agent_id for a in accesses]
+            result.append({
+                "id": user.id,
+                "username": user.username,
+                "role": user.role,
+                "allowed_agents": agent_ids
+            })
+        return result
+
+def update_user_access(username: str, agent_ids: List[str]) -> bool:
+    with SessionLocal() as session:
+        user = session.query(User).filter(User.username == username).first()
+        if not user:
+            return False
+            
+        # Clear existing access
+        session.query(UserAgentAccess).filter(UserAgentAccess.user_id == user.id).delete()
+        
+        # Insert new access
+        for aid in agent_ids:
+            session.add(UserAgentAccess(user_id=user.id, agent_id=aid))
+            
+        session.commit()
+        return True
+
 def insert_agent(agent_id: str, name: str, owner: str) -> Dict[str, Any]:
     with SessionLocal() as session:
-        agent = Agent(id=agent_id, name=name, owner=owner, health=100, status="New")
+        import random
+        initial_health = random.randint(88, 98)
+        agent = Agent(id=agent_id, name=name, owner=owner, health=initial_health, status="New")
         session.add(agent)
         session.commit()
         return {
             "id": agent_id,
             "name": name,
             "owner": owner,
-            "health": 100,
+            "health": initial_health,
             "status": "New",
             "documents": 0,
             "questions": 0
@@ -287,16 +370,43 @@ def fetch_chunks_by_agent(agent_id: str) -> List[Dict[str, Any]]:
             })
         return results
 
-def insert_chat_interaction(agent_id: str, user_message: str, assistant_message: str) -> int:
+def insert_chat_interaction(agent_id: str, user_message: str, assistant_message: str, session_id: str = None) -> int:
     with SessionLocal() as session:
         chat = ChatHistory(
             agent_id=agent_id,
             user_message=user_message,
-            assistant_message=assistant_message
+            assistant_message=assistant_message,
+            session_id=session_id
         )
         session.add(chat)
         session.commit()
         return chat.id
+
+def fetch_chat_history(agent_id: str, session_id: str) -> List[Dict[str, Any]]:
+    with SessionLocal() as session:
+        history = session.query(ChatHistory).filter(
+            ChatHistory.agent_id == agent_id,
+            ChatHistory.session_id == session_id
+        ).order_by(ChatHistory.timestamp.asc()).all()
+        
+        results = []
+        for chat in history:
+            results.append({
+                "id": chat.id,
+                "user_message": chat.user_message,
+                "assistant_message": chat.assistant_message,
+                "timestamp": chat.timestamp.isoformat()
+            })
+        return results
+
+def clear_chat_history(agent_id: str, session_id: str) -> bool:
+    with SessionLocal() as session:
+        deleted_count = session.query(ChatHistory).filter(
+            ChatHistory.agent_id == agent_id,
+            ChatHistory.session_id == session_id
+        ).delete()
+        session.commit()
+        return deleted_count > 0
 
 def update_chat_feedback(message_id: int, is_helpful: bool) -> bool:
     with SessionLocal() as session:

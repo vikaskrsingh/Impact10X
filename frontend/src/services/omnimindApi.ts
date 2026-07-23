@@ -1,3 +1,10 @@
+export interface User {
+  id: number;
+  username: string;
+  role: string;
+  allowed_agents: string[];
+}
+
 export interface AgentRecord {
   id: string;
   name: string;
@@ -6,6 +13,7 @@ export interface AgentRecord {
   questions: number;
   health: number;
   status: string;
+  users?: number;
 }
 
 export interface DocumentRecord {
@@ -25,12 +33,28 @@ export interface ChatResponse {
   confidenceScore: number;
 }
 
+export interface ChatHistoryMessage {
+  id: number;
+  user_message: string;
+  assistant_message: string;
+  timestamp: string;
+}
+
+import { getStoredToken } from "../utils/auth";
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getStoredToken();
+  const headers: HeadersInit = {
+    "Content-Type": "application/json",
+    ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+    ...(init?.headers || {})
+  };
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers,
   });
 
   if (!response.ok) {
@@ -39,6 +63,13 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return response.json() as Promise<T>;
+}
+
+export async function login(username: string, password: string): Promise<{ access_token: string; token_type: string; role: string }> {
+  return api<{ access_token: string; token_type: string; role: string }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
 }
 
 export async function getAgents(): Promise<AgentRecord[]> {
@@ -54,6 +85,17 @@ export async function createAgent(name: string, owner: string): Promise<AgentRec
 
 export async function deleteAgent(agentId: string): Promise<{ deleted: boolean; agentId: string }> {
   return api<{ deleted: boolean; agentId: string }>(`/agents/${agentId}`, { method: "DELETE" });
+}
+
+export async function getUsers(): Promise<User[]> {
+  return api<User[]>("/users");
+}
+
+export async function updateUserAccess(username: string, agentIds: string[]): Promise<void> {
+  await api(`/users/${username}/agents`, {
+    method: "PUT",
+    body: JSON.stringify({ agent_ids: agentIds }),
+  });
 }
 
 export async function getDocuments(agentId?: string): Promise<DocumentRecord[]> {
@@ -74,8 +116,10 @@ export async function uploadDocumentFile(file: File, owner: string, agentId: str
   formData.append("owner", owner);
   formData.append("agentId", agentId);
 
+  const token = getStoredToken();
   const response = await fetch(`${API_BASE_URL}/documents/upload`, {
     method: "POST",
+    headers: token ? { "Authorization": `Bearer ${token}` } : {},
     body: formData,
   });
 
@@ -100,23 +144,35 @@ export async function deleteDocument(docId: string): Promise<{ status: string }>
   });
 }
 
-export async function askExpert(expertId: string, question: string): Promise<ChatResponse> {
+export async function askExpert(
+  expertId: string,
+  question: string,
+  useInternetSearch: boolean = false,
+  sessionId?: string
+): Promise<ChatResponse> {
   return api<ChatResponse>("/chat", {
     method: "POST",
-    body: JSON.stringify({ expertId, question }),
+    body: JSON.stringify({ expertId, question, useInternetSearch, sessionId }),
   });
 }
 
-export async function askMultipleExperts(expertIds: string[], question: string): Promise<ChatResponse> {
+export async function askMultipleExperts(
+  expertIds: string[],
+  question: string,
+  useInternetSearch: boolean = false,
+  sessionId?: string
+): Promise<ChatResponse> {
   return api<ChatResponse>("/chat/multi", {
     method: "POST",
-    body: JSON.stringify({ expertIds, question }),
+    body: JSON.stringify({ expertIds, question, useInternetSearch, sessionId }),
   });
 }
 
 export async function streamExpert(
   expertId: string, 
   question: string,
+  useInternetSearch: boolean,
+  sessionId: string | undefined,
   onMetadata: (metadata: { sources: string[], confidenceScore: number, expert: string }) => void,
   onChunk: (text: string) => void,
   onDone: (id: number) => void
@@ -124,7 +180,7 @@ export async function streamExpert(
   const response = await fetch(`${API_BASE_URL}/chat/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ expertId, question }),
+    body: JSON.stringify({ expertId, question, useInternetSearch, sessionId }),
   });
 
   if (!response.ok) {
@@ -170,6 +226,8 @@ export async function streamExpert(
 export async function streamMultipleExperts(
   expertIds: string[], 
   question: string,
+  useInternetSearch: boolean,
+  sessionId: string | undefined,
   onMetadata: (metadata: { sources: string[], confidenceScore: number, expert: string }) => void,
   onChunk: (text: string) => void,
   onDone: (id: number) => void
@@ -177,7 +235,7 @@ export async function streamMultipleExperts(
   const response = await fetch(`${API_BASE_URL}/chat/multi/stream`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ expertIds, question }),
+    body: JSON.stringify({ expertIds, question, useInternetSearch, sessionId }),
   });
 
   if (!response.ok) {
@@ -220,11 +278,19 @@ export async function streamMultipleExperts(
   }
 }
 
-export async function submitChatFeedback(messageId: number, isHelpful: boolean): Promise<{ status: string }> {
-  return api<{ status: string }>(`/chat/${messageId}/feedback`, {
+export async function submitChatFeedback(messageId: number, isHelpful: boolean): Promise<{ success: boolean }> {
+  return api<{ success: boolean }>(`/chat/${messageId}/feedback`, {
     method: "POST",
     body: JSON.stringify({ isHelpful }),
   });
+}
+
+export async function getChatHistory(expertId: string, sessionId: string): Promise<ChatHistoryMessage[]> {
+  return api<ChatHistoryMessage[]>(`/chat/history/${expertId}?session_id=${encodeURIComponent(sessionId)}`);
+}
+
+export async function clearChatHistory(expertId: string, sessionId: string): Promise<{ status: string }> {
+  return api<{ status: string }>(`/chat/history/${expertId}?session_id=${encodeURIComponent(sessionId)}`, { method: "DELETE" });
 }
 
 export interface DashboardStats {

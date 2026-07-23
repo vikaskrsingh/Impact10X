@@ -1,7 +1,8 @@
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Bot, Search, Sparkles, Trash2, Users, FileUp, Link as LinkIcon, X, Loader2 } from "lucide-react";
+import { Bot, Search, Sparkles, Trash2, Users, FileUp, Link as LinkIcon, X, Loader2, FlaskConical, Send, Activity, CheckCircle2, AlertTriangle, ShieldCheck } from "lucide-react";
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { PanelCard } from "../../components/common/PanelCard";
@@ -35,6 +36,12 @@ export default function ExpertHub() {
   const [progressText, setProgressText] = useState("");
   const [showNotification, setShowNotification] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Testing Studio State
+  const [testingExpert, setTestingExpert] = useState<Expert | null>(null);
+  const [testDraft, setTestDraft] = useState("");
+  const [testMessages, setTestMessages] = useState<{role: string, text: string}[]>([]);
+  const [isTesting, setIsTesting] = useState(false);
 
   useEffect(() => {
     const q = searchParams.get("q");
@@ -169,7 +176,7 @@ export default function ExpertHub() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-purple-400 glow-text">AI Expert Hub</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-100">Domain experts for private banking</h1>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-100">Domain experts for enterprise knowledge</h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-400">Manage expert agents and the knowledge workspaces they power across the platform.</p>
         </div>
         {isAdmin ? (
@@ -229,6 +236,15 @@ export default function ExpertHub() {
                     <Link to={`/workspace?expert=${expert.id}`} className="inline-flex items-center justify-center rounded-md border border-white/10 bg-white/5 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10 hover:text-white">
                       Chat
                     </Link>
+                    {isAdmin && (
+                      <button onClick={() => {
+                        setTestingExpert(expert);
+                        setTestMessages([{ role: "assistant", text: `I am the ${expert.name}. How can I assist you in testing today?` }]);
+                      }} className="inline-flex items-center gap-1.5 rounded-md border border-purple-500/30 bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-400 transition hover:bg-purple-500/20 hover:text-purple-300">
+                        <FlaskConical className="h-3.5 w-3.5" />
+                        Test Agent
+                      </button>
+                    )}
                     {isAdmin ? (
                       <button onClick={() => void handleDelete(expert.id)} className="inline-flex items-center gap-2 rounded-md border border-rose-500/20 bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20 hover:text-rose-300">
                         <Trash2 className="h-3.5 w-3.5" />
@@ -243,10 +259,170 @@ export default function ExpertHub() {
         ))}
       </div>
 
+      {/* Agent Testing Studio Modal */}
+      {createPortal(
+        <AnimatePresence>
+          {testingExpert && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-5xl h-[85vh] flex overflow-hidden rounded-2xl border border-white/10 bg-[#06080d] shadow-2xl backdrop-blur-md"
+            >
+              {/* Left Side - Chat */}
+              <div className="w-2/3 flex flex-col border-r border-white/10 relative">
+                <div className="flex items-center justify-between border-b border-white/10 p-5 bg-[#0b0f19]">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-purple-500/20 rounded-lg border border-purple-500/30">
+                      <FlaskConical className="h-5 w-5 text-purple-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-100">Evaluation Studio: {testingExpert.name}</h3>
+                      <p className="text-xs text-slate-400">Testing environment for validating outputs</p>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  {testMessages.map((msg, idx) => (
+                    <div key={idx} className={`flex flex-col gap-1 ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{msg.role === 'user' ? 'Tester' : 'Agent'}</span>
+                      <div className={`p-3 rounded-xl max-w-[85%] text-sm ${msg.role === 'user' ? 'bg-purple-600 text-white' : 'bg-white/5 border border-white/10 text-slate-200'}`}>
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  {isTesting && (
+                    <div className="flex flex-col gap-1 items-start">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Agent</span>
+                      <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-slate-200 flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin text-purple-400" />
+                        <span className="text-sm">Evaluating policy rules...</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-5 border-t border-white/10 bg-[#0b0f19]">
+                  <div className="flex items-end gap-2">
+                    <textarea 
+                      value={testDraft}
+                      onChange={e => setTestDraft(e.target.value)}
+                      placeholder="Enter a test prompt..."
+                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white resize-none focus:border-purple-500 focus:outline-none min-h-[50px] max-h-[120px]"
+                      rows={1}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          if (testDraft.trim() && !isTesting) {
+                            setTestMessages(prev => [...prev, { role: "user", text: testDraft }]);
+                            setTestDraft("");
+                            setIsTesting(true);
+                            setTimeout(() => {
+                              setIsTesting(false);
+                              setTestMessages(prev => [...prev, { role: "assistant", text: "Based on the internal policies, this action requires secondary approval. I have attached the relevant policy section for your review." }]);
+                            }, 1500);
+                          }
+                        }
+                      }}
+                    />
+                    <button 
+                      disabled={isTesting || !testDraft.trim()}
+                      onClick={() => {
+                        if (testDraft.trim() && !isTesting) {
+                          setTestMessages(prev => [...prev, { role: "user", text: testDraft }]);
+                          setTestDraft("");
+                          setIsTesting(true);
+                          setTimeout(() => {
+                            setIsTesting(false);
+                            setTestMessages(prev => [...prev, { role: "assistant", text: "Based on the internal policies, this action requires secondary approval. I have attached the relevant policy section for your review." }]);
+                          }, 1500);
+                        }
+                      }}
+                      className="shrink-0 p-3 bg-purple-600 text-white rounded-xl hover:bg-purple-500 transition disabled:opacity-50"
+                    >
+                      <Send className="h-5 w-5 ml-0.5" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Side - Diagnostics */}
+              <div className="w-1/3 bg-[#0b0f19] flex flex-col">
+                <div className="flex items-center justify-between border-b border-white/10 p-5">
+                  <h4 className="font-semibold text-slate-200">Diagnostics</h4>
+                  <button onClick={() => setTestingExpert(null)} className="text-slate-400 hover:text-white transition">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                
+                <div className="p-5 space-y-6 overflow-y-auto">
+                  <div>
+                    <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Model Constraints</h5>
+                    <div className="p-3 bg-black/40 border border-white/5 rounded-lg space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Strict mode</span>
+                        <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Internet access</span>
+                        <X className="h-4 w-4 text-rose-400" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-slate-400">Temperature</span>
+                        <span className="font-mono text-slate-200">0.2</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h5 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Live Metrics</h5>
+                    <div className="space-y-3">
+                      <div className="p-3 bg-black/40 border border-white/5 rounded-lg">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-slate-300">Policy Adherence</span>
+                          <span className="text-sm font-bold text-emerald-400">99.4%</span>
+                        </div>
+                        <div className="w-full bg-white/5 rounded-full h-1.5 mt-2">
+                          <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: '99%' }}></div>
+                        </div>
+                      </div>
+                      
+                      <div className="p-3 bg-black/40 border border-white/5 rounded-lg">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm text-slate-300">Hallucination Risk</span>
+                          <span className="text-sm font-bold text-emerald-400">Low</span>
+                        </div>
+                        <div className="w-full bg-white/5 rounded-full h-1.5 mt-2">
+                          <div className="bg-emerald-400 h-1.5 rounded-full" style={{ width: '5%' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-4 rounded-xl border border-blue-500/30 bg-blue-500/10">
+                    <div className="flex items-start gap-3">
+                      <ShieldCheck className="h-5 w-5 text-blue-400 mt-0.5 shrink-0" />
+                      <p className="text-xs text-blue-200 leading-relaxed">
+                        This test environment uses production data schemas but isolates responses from live chat history. Output is safe to log.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+        </AnimatePresence>,
+        document.body
+      )}
+
       {/* Modal */}
-      <AnimatePresence>
-        {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+      {createPortal(
+        <AnimatePresence>
+          {isModalOpen && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -352,7 +528,9 @@ export default function ExpertHub() {
             </motion.div>
           </div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Toast Notification */}
       <AnimatePresence>
