@@ -1,19 +1,33 @@
+from google.auth import credentials
 from typing import List
 from google import genai
 from google.genai import types
 import re
 import os
 import uuid
-
+import google.auth
 from ..core.config import settings
 
+credentials, project = google.auth.default()
 def get_gemini_client():
+    try:
+        # Prefer Vertex AI using Application Default Credentials
+        return genai.Client(
+            vertexai=True, 
+            project=settings.GCP_PROJECT, 
+            location=settings.GCP_LOCATION
+        )
+    except Exception as e:
+        print(f"Error initializing Vertex AI Gemini client: {e}")
+        
+    # Fallback to API key if Vertex AI fails
     api_key = settings.GEMINI_API_KEY
     if api_key:
         try:
             return genai.Client(api_key=api_key)
         except Exception as e:
-            print(f"Error initializing Gemini client: {e}")
+            print(f"Error initializing Gemini client with API key: {e}")
+            
     return None
 
 def process_image_prompts(response_text: str, client) -> str:

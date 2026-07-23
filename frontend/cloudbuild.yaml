@@ -1,0 +1,8 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'us-central1-docker.pkg.dev/hack-team-impactx/cloud-run-source-deploy/omnimind-frontend', '.']
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['push', 'us-central1-docker.pkg.dev/hack-team-impactx/cloud-run-source-deploy/omnimind-frontend']
+serviceAccount: 'projects/hack-team-impactx/serviceAccounts/workload@hack-team-impactx.iam.gserviceaccount.com'
+options:
+  logging: CLOUD_LOGGING_ONLY

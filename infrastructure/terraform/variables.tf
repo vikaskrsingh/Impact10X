@@ -15,8 +15,3 @@ variable "db_password" {
   sensitive   = true
 }
 
-variable "gemini_api_key" {
-  description = "The Gemini API Key for the backend LLM service"
-  type        = string
-  sensitive   = true
-}

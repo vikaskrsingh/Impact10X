@@ -117,60 +117,7 @@ def init_db():
             session.add_all(users)
             session.commit()
 
-        # Check if default agents exist
-        if session.query(Agent).count() == 0:
-            agents = [
-                Agent(id="kyc", name="KYC Expert", owner="Compliance Team", health=98, status="Active"),
-                Agent(id="aml", name="AML Expert", owner="Risk & Compliance", health=97, status="Active"),
-                Agent(id="compliance", name="Compliance Expert", owner="Regulatory Board", health=99, status="Active"),
-                Agent(id="payments", name="Payments Expert", owner="Payments Processing", health=95, status="Active"),
-                Agent(id="risk", name="Risk Expert", owner="Enterprise Risk", health=96, status="Active"),
-                Agent(id="esg", name="ESG Expert", owner="Sustainability", health=94, status="Active"),
-                Agent(id="wealth", name="Wealth Expert", owner="Wealth Management", health=98, status="Active")
-            ]
-            session.add_all(agents)
-            session.commit()
-            
-            default_docs = [
-                ("doc-1", "KYC_Onboarding_Policy_2026.pdf", "Compliance Team", "Approved", "v4", "kyc", "Standard operating procedures for client onboarding."),
-                ("doc-2", "AML_Sanctions_Policy_2026.pdf", "Risk & Compliance", "Approved", "v2", "aml", "Detailed policy on sanctions screening."),
-                ("doc-3", "ESG Greenwashing Guidelines.pdf", "Sustainability", "In Review", "v1", "esg", "Guidelines on environmental metrics reporting."),
-                ("doc-4", "Wealth Management Client Suitability.pdf", "Wealth Management", "Approved", "v3", "wealth", "Credit limits and investment risk policies.")
-            ]
-            
-            for doc_id, name, owner, status, version, agent_id, content in default_docs:
-                doc = Document(
-                    id=doc_id,
-                    name=name,
-                    owner=owner,
-                    status=status,
-                    version=version,
-                    agent_id=agent_id,
-                    content=content
-                )
-                session.add(doc)
-                
-                chunk = DocumentChunk(
-                    document_id=doc_id,
-                    agent_id=agent_id,
-                    chunk_index=0,
-                    content=content
-                )
-                session.add(chunk)
-            session.commit()
-            
-            # Grant default access for expert users to specific agents initially
-            expert_users = session.query(User).filter(User.role == 'expert').all()
-            expert_assignments = {
-                "Chitra": ["kyc", "aml"],
-                "Pranita": ["compliance", "risk"],
-                "expert": ["kyc", "aml", "compliance"]
-            }
-            for expert in expert_users:
-                assigned = expert_assignments.get(expert.username, ["kyc"])
-                for agent_id in assigned:
-                    session.add(UserAgentAccess(user_id=expert.id, agent_id=agent_id))
-            session.commit()
+        # Dummy agents seeding removed
 
 def fetch_agents(username: Optional[str] = None, role: Optional[str] = None) -> List[Dict[str, Any]]:
     with SessionLocal() as session:

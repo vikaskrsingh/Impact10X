@@ -42,12 +42,24 @@ def compute_local_similarity(query_tokens: List[str], chunk_text: str) -> float:
     return numerator / denominator
 
 def get_gemini_client() -> Optional[genai.Client]:
+    try:
+        # Prefer Vertex AI using Application Default Credentials
+        return genai.Client(
+            vertexai=True, 
+            project=settings.GCP_PROJECT, 
+            location=settings.GCP_LOCATION
+        )
+    except Exception as e:
+        print(f"Error initializing Vertex AI Gemini client for embeddings: {e}")
+        
+    # Fallback to API key if Vertex AI fails
     api_key = settings.GEMINI_API_KEY
     if api_key:
         try:
             return genai.Client(api_key=api_key)
         except Exception as e:
-            print(f"Error initializing Gemini client for embeddings: {e}")
+            print(f"Error initializing Gemini client with API key for embeddings: {e}")
+            
     return None
 
 def _embed_chunk(idx: int, chunk: str, client: Optional[genai.Client]) -> Dict[str, Any]:

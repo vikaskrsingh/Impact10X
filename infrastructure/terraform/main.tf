@@ -51,17 +51,28 @@ resource "google_artifact_registry_repository" "omnimind_repo" {
   format        = "DOCKER"
 }
 
-# --- Secret Manager ---
-resource "google_secret_manager_secret" "gemini_api_key" {
-  secret_id = "gemini-api-key"
-  replication {
-    auto {}
-  }
+# --- Service Account & IAM ---
+resource "google_service_account" "backend_sa" {
+  account_id   = "omnimind-backend-sa"
+  display_name = "OmniMind Backend Service Account"
 }
 
-resource "google_secret_manager_secret_version" "gemini_api_key_version" {
-  secret      = google_secret_manager_secret.gemini_api_key.id
-  secret_data = var.gemini_api_key
+resource "google_project_iam_member" "vertex_ai_user" {
+  project = var.project_id
+  role    = "roles/aiplatform.user"
+  member  = "serviceAccount:${google_service_account.backend_sa.email}"
+}
+
+resource "google_project_iam_member" "cloudsql_client" {
+  project = var.project_id
+  role    = "roles/cloudsql.client"
+  member  = "serviceAccount:${google_service_account.backend_sa.email}"
+}
+
+resource "google_storage_bucket_iam_member" "gcs_admin" {
+  bucket = google_storage_bucket.omnimind_docs.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.backend_sa.email}"
 }
 
 # --- Cloud Run: Backend ---
@@ -70,6 +81,7 @@ resource "google_cloud_run_v2_service" "omnimind_backend" {
   location = var.region
 
   template {
+    service_account = google_service_account.backend_sa.email
     containers {
       # Use a placeholder image initially. You must push your real image and run terraform apply again.
       image = "us-docker.pkg.dev/cloudrun/container/hello"
@@ -85,13 +97,13 @@ resource "google_cloud_run_v2_service" "omnimind_backend" {
       }
       
       env {
-        name = "GEMINI_API_KEY"
-        value_source {
-          secret_key_ref {
-            secret  = google_secret_manager_secret.gemini_api_key.secret_id
-            version = "latest"
-          }
-        }
+        name  = "GCP_PROJECT"
+        value = var.project_id
+      }
+      
+      env {
+        name  = "GCP_LOCATION"
+        value = var.region
       }
     }
     

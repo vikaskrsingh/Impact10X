@@ -32,7 +32,7 @@ OmniMind (AURA) follows a decoupled, modular client-server architecture designed
 - **Relational Database:** Managed via SQLAlchemy. Defaults to SQLite for immediate local setup, with native support for PostgreSQL (via `psycopg2`) for enterprise deployments.
 - **Vector Database:** Local vector storage for Retrieval-Augmented Generation (RAG) embeddings.
 - **LLM Engine Options:**
-  - **Cloud AI (Gemini):** Integration with Google's Gemini API (`gemini-3.5-flash`, `text-embedding-004`) for cloud-based scaling.
+  - **Cloud AI (Vertex AI):** Integration with Google Cloud Vertex AI (`gemini-3.5-flash`, `text-embedding-004`) using Application Default Credentials for secure, keyless access.
 
 ## Project Structure
 
@@ -133,12 +133,17 @@ OmniMind is designed to be deployed as a decoupled application. The backend will
 *Note: For a production-ready system, you should replace the local SQLite database with Google Cloud SQL (PostgreSQL). The following instructions deploy OmniMind as a "stateless prototype", meaning the local database will reset whenever the Cloud Run instance sleeps due to inactivity.*
 
 ### Prerequisites for Deployment
-1. Ensure you have the Google Cloud CLI installed (`gcloud auth login`).
-2. Ensure you have the Firebase CLI installed (`npm install -g firebase-tools` and `firebase login`).
-3. Ensure you have a Google Cloud Project with billing enabled.
-4. Enable the required GCP APIs:
+1. Ensure you have the Google Cloud CLI installed.
+2. Authenticate with Google Cloud and set up your Application Default Credentials (ADC) for Vertex AI:
    ```bash
-   gcloud services enable artifactregistry.googleapis.com cloudbuild.googleapis.com run.googleapis.com
+   gcloud auth login
+   gcloud auth application-default login
+   ```
+3. Ensure you have the Firebase CLI installed (`npm install -g firebase-tools` and `firebase login`).
+4. Ensure you have a Google Cloud Project with billing enabled, and the Vertex AI API enabled.
+5. Enable the required GCP APIs:
+   ```bash
+   gcloud services enable artifactregistry.googleapis.com cloudbuild.googleapis.com run.googleapis.com aiplatform.googleapis.com
    ```
 
 ### Step 1: Deploy the Backend to Cloud Run

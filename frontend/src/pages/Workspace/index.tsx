@@ -43,15 +43,9 @@ const DEFAULT_PROMPTS = [
  { category: "General", text: "What are the core requirements for new customer onboarding?" },
 ];
 
-const expertsSeed: ExpertThread[] = [
- { id: "kyc", name: "KYC Expert", owner: "Compliance Team", description: "Specialized in Know Your Customer policies, procedures and documentation.", stats: { docs: 128, questions: "24.6k", accuracy: "98%", updated: "2m ago" } },
- { id: "aml", name: "AML Expert", owner: "Risk & Compliance", description: "Specialized in Anti Money Laundering regulations and transaction monitoring.", stats: { docs: 245, questions: "42.1k", accuracy: "97%", updated: "5m ago" } },
- { id: "compliance", name: "Compliance Expert", owner: "Regulatory Board", description: "Broad regulatory compliance and policy guidelines.", stats: { docs: 512, questions: "89k", accuracy: "99%", updated: "1h ago" } },
- { id: "payments", name: "Payments Expert", owner: "Payments Processing", description: "Specialized in cross-border payments and transfer regulations.", stats: { docs: 89, questions: "12.3k", accuracy: "95%", updated: "4h ago" } },
- { id: "risk", name: "Risk Expert", owner: "Enterprise Risk", description: "Operational and enterprise risk assessment frameworks.", stats: { docs: 156, questions: "31k", accuracy: "96%", updated: "1d ago" } },
- { id: "esg", name: "ESG Expert", owner: "Sustainability", description: "Environmental, Social, and Governance reporting standards.", stats: { docs: 73, questions: "5.4k", accuracy: "94%", updated: "2d ago" } },
- { id: "wealth", name: "Wealth Expert", owner: "Wealth Management", description: "High-net-worth client advisory and investment products.", stats: { docs: 310, questions: "55k", accuracy: "98%", updated: "30m ago" } },
-];
+const fallbackExpert: ExpertThread = {
+  id: "none", name: "No Expert", owner: "System", description: "Create an expert to get started.", stats: { docs: 0, questions: "0", accuracy: "0%", updated: "Now" }
+};
 
 const expertDocuments: Record<string, ReferenceDocument[]> = {
  kyc: [
@@ -96,7 +90,7 @@ export default function Workspace() {
  const [searchParams] = useSearchParams();
  const [threads, setThreads] = useState<Record<string, Message[]>>(defaultThreads);
  const [draft, setDraft] = useState("");
- const [experts, setExperts] = useState<ExpertThread[]>(expertsSeed);
+ const [experts, setExperts] = useState<ExpertThread[]>([]);
  const [referenceDocuments, setReferenceDocuments] = useState<ReferenceDocument[]>(expertDocuments.kyc);
  const [isTyping, setIsTyping] = useState(false);
  const [showSources, setShowSources] = useState(true);
@@ -130,7 +124,7 @@ export default function Workspace() {
 
  const expertParam = searchParams.get("expert") ?? "kyc";
  const selectedExpertId = experts.some((e) => e.id === expertParam) ? expertParam : (experts.length > 0 ? experts[0].id : "kyc");
- const selectedExpert = experts.find((e) => e.id === selectedExpertId) ?? (experts.length > 0 ? experts[0] : expertsSeed[0]);
+ const selectedExpert = experts.find((e) => e.id === selectedExpertId) ?? (experts.length > 0 ? experts[0] : fallbackExpert);
  const defaultActiveMessages: Message[] = [{
   role: "assistant",
   text: `I am the ${selectedExpert.name}. How can I assist you today?`,
@@ -202,7 +196,7 @@ export default function Workspace() {
  const loadExperts = async () => {
   try {
    const agents = await getAgents();
-   if (agents && agents.length > 0) {
+   if (agents) {
     const mappedExperts = agents.map((agent) => ({
      id: agent.id,
      name: agent.name,
@@ -210,7 +204,7 @@ export default function Workspace() {
      description: `${agent.name} knowledge workspace`,
      stats: { docs: agent.documents || 0, questions: (agent.questions || 0).toString(), accuracy: agent.health ? `${agent.health}%` : "95%", updated: "Just now" }
     }));
-    setExperts(mappedExperts.length > 0 ? mappedExperts : expertsSeed);
+    setExperts(mappedExperts);
    }
   } catch (error) {
    console.error("Unable to load expert workspace", error);

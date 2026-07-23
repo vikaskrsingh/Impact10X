@@ -27,7 +27,7 @@ class Settings:
     GEMINI_API_KEY: str = os.environ.get("GEMINI_API_KEY", "")
 
     # ── Chat models ───────────────────────────────────────────────────
-    GEMINI_CHAT_MODEL: str = os.environ.get("GEMINI_CHAT_MODEL", "gemini-3.5-flash")
+    GEMINI_CHAT_MODEL: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
 
     # ── Embedding models ──────────────────────────────────────────────
     GEMINI_EMBED_MODEL: str = os.environ.get("GEMINI_EMBED_MODEL", "text-embedding-004")
@@ -37,6 +37,8 @@ class Settings:
 
     # ── Cloud storage (optional) ──────────────────────────────────────
     GCS_BUCKET_NAME: str = os.environ.get("GCS_BUCKET_NAME", "")
+    GCP_PROJECT: str = os.environ.get("GCP_PROJECT", "hack-team-impactx")
+    GCP_LOCATION: str = os.getenv("GCP_LOCATION", "global")
 
     # ── Image Generation ──────────────────────────────────────────────
     ENABLE_IMAGE_GENERATION: bool = os.environ.get("ENABLE_IMAGE_GENERATION", "false").lower() == "true"
