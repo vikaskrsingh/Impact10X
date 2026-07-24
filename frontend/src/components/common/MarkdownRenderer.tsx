@@ -3,10 +3,20 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import mermaid from 'mermaid';
 
-// Initialize mermaid
+// Initialize mermaid with a vibrant custom theme
 mermaid.initialize({
   startOnLoad: false,
-  theme: 'dark',
+  theme: 'base',
+  themeVariables: {
+    primaryColor: '#8b5cf6',       // Vibrant purple
+    primaryTextColor: '#ffffff',
+    primaryBorderColor: '#6d28d9', // Darker purple border
+    lineColor: '#94a3b8',          // Slate-400 lines
+    secondaryColor: '#3b82f6',     // Bright blue
+    tertiaryColor: '#10b981',      // Emerald green
+    nodeBorder: '#ffffff',
+    mainBkg: '#1e293b',            // Slate-800 background
+  },
   fontFamily: 'inherit',
 });
 
@@ -27,6 +37,11 @@ const Mermaid = ({ chart }: { chart: string }) => {
              cleanChart = cleanChart.substring(8).trim();
           }
 
+          // The most reliable way to color flowcharts is using classDefs
+          if (cleanChart.includes('graph ') || cleanChart.includes('flowchart ')) {
+              cleanChart += '\nclassDef default fill:#8b5cf6,stroke:#6d28d9,stroke-width:2px,color:#fff;';
+          }
+          
           const { svg } = await mermaid.render(id, cleanChart);
           if (containerRef.current) {
             containerRef.current.innerHTML = svg;

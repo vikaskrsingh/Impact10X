@@ -18,8 +18,9 @@ import { Button } from "@/components/ui/button";
 import { MetricCard, PanelCard } from "../components/common/PanelCard";
 import { getStoredRole, isAdminRole, getStoredUsername } from "@/utils/auth";
 import { useEffect, useState } from "react";
-import { getDashboardStats, getRecentActivity, getRecentUploads, getAgents } from "../services/omnimindApi";
-import type { DashboardStats, DashboardActivity, DashboardUpload, AgentRecord } from "../services/omnimindApi";
+import { getDashboardStats, getRecentActivity, getRecentUploads, getAgents, getTokenMetrics } from "../services/omnimindApi";
+import type { DashboardStats, DashboardActivity, DashboardUpload, AgentRecord, TokenMetrics } from "../services/omnimindApi";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function Dashboard() {
   const role = getStoredRole();
@@ -35,21 +36,24 @@ export default function Dashboard() {
   const [activity, setActivity] = useState<DashboardActivity[]>([]);
   const [uploads, setUploads] = useState<DashboardUpload[]>([]);
   const [agents, setAgents] = useState<AgentRecord[]>([]);
+  const [tokenMetrics, setTokenMetrics] = useState<TokenMetrics | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [statsData, activityData, uploadsData, agentsData] = await Promise.all([
+        const [statsData, activityData, uploadsData, agentsData, tokensData] = await Promise.all([
           getDashboardStats(),
           getRecentActivity(),
           getRecentUploads(),
-          getAgents()
+          getAgents(),
+          getTokenMetrics().catch(() => null)
         ]);
         setStats(statsData);
         setActivity(activityData);
         setUploads(uploadsData);
         setAgents(agentsData);
+        setTokenMetrics(tokensData);
       } catch (error) {
         console.error("Failed to load dashboard data", error);
       } finally {
@@ -149,6 +153,33 @@ export default function Dashboard() {
           </div>
         </PanelCard>
       </div>
+      
+      {/* Real-time Token & Cost Usage */}
+      {tokenMetrics && (
+      <div className="mb-6">
+        <PanelCard title="Token Usage & Cost Intelligence" subtitle={`Total Cost: $${tokenMetrics.total_cost_usd.toFixed(4)} USD | Total Tokens: ${tokenMetrics.total_tokens.toLocaleString()}`}>
+          <div className="h-64 mt-4">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={tokenMetrics.chart_data}>
+                <defs>
+                  <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="date" stroke="#475569" fontSize={12} tickLine={false} axisLine={false} />
+                <YAxis stroke="#475569" fontSize={12} tickLine={false} axisLine={false} tickFormatter={(val) => `${(val/1000)}k`} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px', color: '#f8fafc' }}
+                  itemStyle={{ color: '#c084fc' }}
+                />
+                <Area type="monotone" dataKey="tokens" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorTokens)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </PanelCard>
+      </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
 

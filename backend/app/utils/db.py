@@ -3,7 +3,7 @@ from typing import List, Dict, Any, Optional
 
 from sqlalchemy import (
     create_engine, Column, String, Integer, ForeignKey, Text, DateTime,
-    func, event
+    func, event, Float
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship, aliased
 from pgvector.sqlalchemy import Vector
@@ -93,8 +93,22 @@ class ChatHistory(Base):
 
     agent = relationship("Agent", back_populates="chat_history")
 
+class TokenUsage(Base):
+    __tablename__ = 'token_usage'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(String, index=True, nullable=True)
+    operation = Column(String, nullable=False) # 'chat' or 'embed'
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cost = Column(Float, default=0.0)
+    timestamp = Column(DateTime, default=datetime.datetime.utcnow)
+
 
 def init_db():
+    from sqlalchemy import text
+    if settings.VECTOR_DB_TYPE == "postgres":
+        with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
     Base.metadata.create_all(bind=engine)
     
     with SessionLocal() as session:
@@ -449,3 +463,47 @@ def fetch_recent_activity(limit: int = 4) -> List[Dict[str, Any]]:
             })
             
         return combined[:limit]
+
+def fetch_token_metrics() -> Dict[str, Any]:
+    with SessionLocal() as session:
+        # Sum all tokens and cost
+        total_input = session.query(func.sum(TokenUsage.input_tokens)).scalar() or 0
+        total_output = session.query(func.sum(TokenUsage.output_tokens)).scalar() or 0
+        total_cost = session.query(func.sum(TokenUsage.cost)).scalar() or 0.0
+        
+        # Get usage over the last 7 days for a chart
+        seven_days_ago = datetime.datetime.utcnow() - datetime.timedelta(days=7)
+        # We'll just group by the date component of the timestamp
+        daily_records = session.query(
+            func.date(TokenUsage.timestamp).label('day'),
+            func.sum(TokenUsage.input_tokens + TokenUsage.output_tokens).label('tokens'),
+            func.sum(TokenUsage.cost).label('cost')
+        ).filter(TokenUsage.timestamp >= seven_days_ago) \
+         .group_by(func.date(TokenUsage.timestamp)) \
+         .order_by(func.date(TokenUsage.timestamp)).all()
+         
+        chart_data = []
+        for r in daily_records:
+            chart_data.append({
+                "date": str(r.day),
+                "tokens": int(r.tokens),
+                "cost": float(r.cost)
+            })
+            
+        # If there's only 1 data point, Recharts AreaChart won't draw anything.
+        # Add a dummy data point for the previous day so it renders a line.
+        if len(chart_data) == 1:
+            prev_date = datetime.datetime.strptime(chart_data[0]["date"], "%Y-%m-%d") - datetime.timedelta(days=1)
+            chart_data.insert(0, {
+                "date": prev_date.strftime("%Y-%m-%d"),
+                "tokens": 0,
+                "cost": 0.0
+            })
+            
+        return {
+            "total_input_tokens": int(total_input),
+            "total_output_tokens": int(total_output),
+            "total_tokens": int(total_input + total_output),
+            "total_cost_usd": float(total_cost),
+            "chart_data": chart_data
+        }

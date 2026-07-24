@@ -40,9 +40,21 @@ export interface ChatHistoryMessage {
   timestamp: string;
 }
 
+export interface TokenMetrics {
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_tokens: number;
+  total_cost_usd: number;
+  chart_data: Array<{
+    date: string;
+    tokens: number;
+    cost: number;
+  }>;
+}
+
 import { getStoredToken } from "../utils/auth";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+const API_BASE_URL = "https://omnimind-backend-591687905909.us-central1.run.app";
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredToken();
@@ -70,6 +82,10 @@ export async function login(username: string, password: string): Promise<{ acces
     method: "POST",
     body: JSON.stringify({ username, password }),
   });
+}
+
+export async function getTokenMetrics(): Promise<TokenMetrics> {
+  return api<TokenMetrics>("/dashboard/tokens");
 }
 
 export async function getAgents(): Promise<AgentRecord[]> {

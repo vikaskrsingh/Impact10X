@@ -1,12 +1,14 @@
 from google.auth import credentials
-from typing import List
+from typing import List, Dict, Any, Optional
 from google import genai
 from google.genai import types
 import re
 import os
 import uuid
 import google.auth
+import threading
 from ..core.config import settings
+from ..utils.db import SessionLocal, TokenUsage
 
 credentials, project = google.auth.default()
 def get_gemini_client():
@@ -15,19 +17,13 @@ def get_gemini_client():
         return genai.Client(
             vertexai=True, 
             project=settings.GCP_PROJECT, 
-            location=settings.GCP_LOCATION
+            location=settings.GCP_LOCATION,
+            credentials=credentials
         )
     except Exception as e:
         print(f"Error initializing Vertex AI Gemini client: {e}")
         
-    # Fallback to API key if Vertex AI fails
-    api_key = settings.GEMINI_API_KEY
-    if api_key:
-        try:
-            return genai.Client(api_key=api_key)
-        except Exception as e:
-            print(f"Error initializing Gemini client with API key: {e}")
-            
+
     return None
 
 def process_image_prompts(response_text: str, client) -> str:
@@ -181,6 +177,24 @@ def generate_grounded_answer_stream(
         f"Retrieved Context:\n{formatted_context}\n"
         f"Question: {user_question}"
     )
+    
+    def _record_usage_async(input_tokens, output_tokens):
+        def _task():
+            try:
+                with SessionLocal() as session:
+                    # Flash 1.5 costs: $0.075 / 1M input, $0.30 / 1M output
+                    cost = (input_tokens * 0.075 / 1000000) + (output_tokens * 0.30 / 1000000)
+                    tu = TokenUsage(
+                        operation='chat',
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
+                        cost=cost
+                    )
+                    session.add(tu)
+                    session.commit()
+            except Exception as e:
+                print(f"Failed to record token usage: {e}")
+        threading.Thread(target=_task).start()
 
     if client:
         try:
@@ -199,6 +213,11 @@ def generate_grounded_answer_stream(
             for chunk in response_stream:
                 if chunk.text:
                     yield chunk.text
+                if getattr(chunk, 'usage_metadata', None):
+                    _record_usage_async(
+                        chunk.usage_metadata.prompt_token_count or 0,
+                        chunk.usage_metadata.candidates_token_count or 0
+                    )
             return
         except Exception as e:
             print(f"Error during Gemini generation: {e}. Falling back to simulated generation.")
@@ -237,7 +256,7 @@ def generate_grounded_answer_stream(
         f"[SIMULATED RESPONSE - API Unavailable/Unconfigured]\n\n"
         f"Grounded response based on approved knowledge assets ({sources_str}):\n\n"
         f"{joined_sentences}\n\n"
-        f"For real LLM reasoning, please ensure your GEMINI_API_KEY is valid and the API is reachable."
+        f"For real LLM reasoning, please ensure your Vertex AI Application Default Credentials (ADC) are valid and the API is reachable."
     )
     import time
     words = answer.split(' ')

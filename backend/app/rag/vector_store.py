@@ -41,25 +41,28 @@ def compute_local_similarity(query_tokens: List[str], chunk_text: str) -> float:
         return 0.0
     return numerator / denominator
 
+def compute_cosine_similarity(v1: List[float], v2: List[float]) -> float:
+    if not v1 or not v2:
+        return 0.0
+    dot = sum(a*b for a, b in zip(v1, v2))
+    mag1 = math.sqrt(sum(a*a for a in v1))
+    mag2 = math.sqrt(sum(b*b for b in v2))
+    return dot / (mag1 * mag2) if mag1 and mag2 else 0.0
+
 def get_gemini_client() -> Optional[genai.Client]:
     try:
-        # Prefer Vertex AI using Application Default Credentials
+        import google.auth
+        credentials, project = google.auth.default()
+        # Embeddings require us-central1 (they are not available in global)
         return genai.Client(
             vertexai=True, 
             project=settings.GCP_PROJECT, 
-            location=settings.GCP_LOCATION
+            location="us-central1",
+            credentials=credentials
         )
     except Exception as e:
         print(f"Error initializing Vertex AI Gemini client for embeddings: {e}")
         
-    # Fallback to API key if Vertex AI fails
-    api_key = settings.GEMINI_API_KEY
-    if api_key:
-        try:
-            return genai.Client(api_key=api_key)
-        except Exception as e:
-            print(f"Error initializing Gemini client with API key for embeddings: {e}")
-            
     return None
 
 def _embed_chunk(idx: int, chunk: str, client: Optional[genai.Client]) -> Dict[str, Any]:
@@ -70,7 +73,8 @@ def _embed_chunk(idx: int, chunk: str, client: Optional[genai.Client]) -> Dict[s
                 model=settings.GEMINI_EMBED_MODEL,
                 contents=chunk
             )
-            embedding_list = response.embeddings[0].values
+            # Truncate to 768 dimensions to match the DB schema
+            embedding_list = response.embeddings[0].values[:768]
         except Exception as e:
             print(f"Failed to generate Gemini embedding for chunk {idx}: {e}")
             
@@ -130,19 +134,21 @@ def retrieve_context(agent_id: str, query: str, top_k: int = 3) -> List[Dict[str
                 model=settings.GEMINI_EMBED_MODEL,
                 contents=query
             )
-            query_embedding = response.embeddings[0].values
+            # Truncate query to 768 dimensions to match the chunks
+            query_embedding = response.embeddings[0].values[:768]
             
-            with SessionLocal() as session:
-                chunks = session.query(DocumentChunk).filter(DocumentChunk.agent_id == agent_id).order_by(
-                    DocumentChunk.embedding.cosine_distance(query_embedding)
-                ).limit(top_k).all()
-                
-                if chunks:
-                    return [{"content": c.content, "document_id": c.document_id} for c in chunks]
+            if settings.VECTOR_DB_TYPE != "sqlite":
+                with SessionLocal() as session:
+                    chunks = session.query(DocumentChunk).filter(DocumentChunk.agent_id == agent_id).order_by(
+                        DocumentChunk.embedding.cosine_distance(query_embedding)
+                    ).limit(top_k).all()
+                    
+                    if chunks:
+                        return [{"content": c.content, "document_id": c.document_id} for c in chunks]
         except Exception as e:
-            print(f"Native vector search failed, falling back to local keyword matching: {e}")
+            print(f"Native vector search failed, falling back to local search: {e}")
             
-    # 2. Fallback to local keyword search
+    # 2. Fallback to local search (Python vector similarity or keyword matching)
     chunks = fetch_chunks_by_agent(agent_id)
     if not chunks:
         return []
@@ -151,7 +157,23 @@ def retrieve_context(agent_id: str, query: str, top_k: int = 3) -> List[Dict[str
     scored_chunks = []
     
     for chunk in chunks:
-        similarity = compute_local_similarity(query_tokens, chunk["content"])
+        # Prefer vector similarity if query_embedding and chunk embedding exist
+        chunk_embedding = chunk.get("embedding")
+        if 'query_embedding' in locals() and chunk_embedding:
+            # In SQLite, pgvector might return the embedding as a string
+            if isinstance(chunk_embedding, str):
+                import json
+                try:
+                    chunk_embedding = json.loads(chunk_embedding)
+                except Exception:
+                    chunk_embedding = []
+            
+            if chunk_embedding:
+                similarity = compute_cosine_similarity(query_embedding, chunk_embedding)
+            else:
+                similarity = compute_local_similarity(query_tokens, chunk["content"])
+        else:
+            similarity = compute_local_similarity(query_tokens, chunk["content"])
         scored_chunks.append((chunk, similarity))
         
     scored_chunks.sort(key=lambda x: x[1], reverse=True)

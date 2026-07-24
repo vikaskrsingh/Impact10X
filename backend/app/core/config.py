@@ -30,7 +30,7 @@ class Settings:
     GEMINI_CHAT_MODEL: str = os.getenv("GEMINI_CHAT_MODEL", "gemini-2.5-flash")
 
     # ── Embedding models ──────────────────────────────────────────────
-    GEMINI_EMBED_MODEL: str = os.environ.get("GEMINI_EMBED_MODEL", "text-embedding-004")
+    GEMINI_EMBED_MODEL: str = os.environ.get("GEMINI_EMBED_MODEL", "gemini-embedding-001")
 
     # ── Vector DB ─────────────────────────────────────────────────────
     VECTOR_DB_TYPE: str = os.environ.get("VECTOR_DB_TYPE", "sqlite")
@@ -38,7 +38,7 @@ class Settings:
     # ── Cloud storage (optional) ──────────────────────────────────────
     GCS_BUCKET_NAME: str = os.environ.get("GCS_BUCKET_NAME", "")
     GCP_PROJECT: str = os.environ.get("GCP_PROJECT", "hack-team-impactx")
-    GCP_LOCATION: str = os.getenv("GCP_LOCATION", "global")
+    GCP_LOCATION: str = os.getenv("GCP_LOCATION", "us-central1")
 
     # ── Image Generation ──────────────────────────────────────────────
     ENABLE_IMAGE_GENERATION: bool = os.environ.get("ENABLE_IMAGE_GENERATION", "false").lower() == "true"

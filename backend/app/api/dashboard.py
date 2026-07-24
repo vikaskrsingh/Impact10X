@@ -18,3 +18,9 @@ def get_recent_uploads():
 def get_recent_activity():
     """Retrieve the recent activity feed."""
     return fetch_recent_activity()
+
+@router.get("/tokens", response_model=Dict[str, Any])
+def get_token_metrics():
+    """Retrieve token usage and cost metrics."""
+    from ..utils.db import fetch_token_metrics
+    return fetch_token_metrics()
